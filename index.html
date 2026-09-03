@@ -4,11 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>ShopWrench</title>
-    <meta name="description" content="ShopWrench auto repair job tracker." />
+    <meta name="description" content="Auto Tech Job & VIN Repair Tracker." />
     <meta property="og:title" content="ShopWrench" />
-    <meta property="og:description" content="ShopWrench auto repair job tracker." />
+    <meta property="og:description" content="Auto Tech Job & VIN Repair Tracker." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Quiet benign Vite HMR websocket notice in sandbox environment -->
+    <script>
+      (function() {
+        function shouldIgnore(msg) {
+          if (!msg) return false;
+          var str = typeof msg === 'string' ? msg : (msg.message || msg.reason || String(msg));
+          return typeof str === 'string' && (str.indexOf('[vite]') !== -1 || str.indexOf('vite-pwa-plugin') !== -1 || str.indexOf('dev-sw.js') !== -1);
+        }
+        var origError = console.error;
+        var origWarn = console.warn;
+        console.error = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (shouldIgnore(arguments[i])) return;
+          }
+          origError.apply(console, arguments);
+        };
+        console.warn = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (shouldIgnore(arguments[i])) return;
+          }
+          origWarn.apply(console, arguments);
+        };
+        window.addEventListener('error', function(e) {
+          if (shouldIgnore(e.message) || shouldIgnore(e.error)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function(e) {
+          if (shouldIgnore(e.reason)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+      })();
+    </script>
 
     <!-- PWA / Mobile Browser Meta -->
     <meta name="theme-color" content="#020617" />

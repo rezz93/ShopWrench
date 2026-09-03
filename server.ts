@@ -64,7 +64,7 @@ Analyze the image carefully:
 - If you find multiple numbers or text, pick the one that matches standard 17-character automotive VIN structure. If no 17-character VIN is identifiable, extract the closest candidate.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
+        model: 'gemini-3.8-flash',
         contents: [
           {
             role: 'user',
@@ -136,7 +136,10 @@ Analyze the image carefully:
   // Vite middleware in dev, static files in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

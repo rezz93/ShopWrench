@@ -7,10 +7,14 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.2',
+  version: '1.4.4',
   releaseDate: '2026-09-03',
-  build: 'rev-2026.09.03-p4',
+  build: 'rev-2026.09.03-p6',
   changes: [
+    'Resolved [vite] websocket connection error by disabling HMR in dev middleware',
+    'Disabled devOptions service worker injection in vite.config.ts',
+    'Comprehensive error and rejection handlers for benign development notices',
+    'Updated server Gemini model to gemini-3.8-flash',
     'Comprehensive layman README.md guide for phone and PC setup, login, and step-by-step job example',
     'Direct rockauto.com vehicle catalog navigation (opens directly on rockauto.com, bypassing Google search)',
     'Part name auto-copied to clipboard for instant search/filtering on RockAuto',
