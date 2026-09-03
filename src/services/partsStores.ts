@@ -134,6 +134,29 @@ export function saveCustomStores(stores: AutoPartsStore[]): void {
   }
 }
 
+export function buildRockAutoCatalogUrl(
+  year: string,
+  make: string,
+  model: string,
+  _engine?: string,
+  _partName?: string
+): string {
+  const cleanMake = encodeURIComponent((make || '').trim().toLowerCase().replace(/\s+/g, '+'));
+  const cleanYear = encodeURIComponent((year || '').trim());
+  const cleanModel = encodeURIComponent((model || '').trim().toLowerCase().replace(/\s+/g, '+'));
+
+  if (cleanMake && cleanYear && cleanModel) {
+    return `https://www.rockauto.com/en/catalog/${cleanMake},${cleanYear},${cleanModel}`;
+  }
+  if (cleanMake && cleanYear) {
+    return `https://www.rockauto.com/en/catalog/${cleanMake},${cleanYear}`;
+  }
+  if (cleanMake) {
+    return `https://www.rockauto.com/en/catalog/${cleanMake}`;
+  }
+  return 'https://www.rockauto.com/en/catalog/';
+}
+
 export function addCustomStore(params: {
   name: string;
   shortName?: string;
@@ -338,11 +361,14 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     id: 'rockauto',
     name: 'RockAuto Parts Catalog',
     shortName: 'RockAuto',
-    tagline: 'Wholesale OEM & aftermarket warehouse catalog tree',
+    tagline: 'Wholesale OEM & aftermarket warehouse catalog on rockauto.com',
     category: 'Warehouse Catalog',
     badgeColor: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
     accentColor: 'text-sky-400 hover:border-sky-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
+      return buildRockAutoCatalogUrl(year, make, model, engine, partName);
+    },
+    buildDirectProductUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
       return `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`;
     },

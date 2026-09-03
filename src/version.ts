@@ -1,3 +1,4 @@
+// RULE: Increment version by 0.0.1 on every code change (e.g. 1.4.1 -> 1.4.2)
 export interface VersionInfo {
   version: string;
   releaseDate: string;
@@ -6,14 +7,14 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.0',
+  version: '1.4.1',
   releaseDate: '2026-09-03',
-  build: 'rev-2026.09.03-p2',
+  build: 'rev-2026.09.03-p3',
   changes: [
+    'Direct rockauto.com vehicle catalog navigation (opens directly on rockauto.com, bypassing Google search)',
+    'Part name auto-copied to clipboard for instant search/filtering on RockAuto',
     'Vehicle and part details carry-over for AutoZone, O\'Reilly, and Advance Auto Parts',
     'Direct Product Link (Bypass Redirect) for immediate indexed store results',
-    'Automatic search query copy to clipboard for rapid 1-click paste into parts sites',
-    'Standardized mechanic shorthand terms (e.g. temp sensor -> Engine Coolant Temperature Sensor)',
     '1-Click Google Shopping price comparison across all retail suppliers',
     'Multi-device real-time sync with Firebase cloud database'
   ]

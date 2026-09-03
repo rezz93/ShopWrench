@@ -30,7 +30,7 @@ import {
 } from '../services/storage';
 import { Job, JobStatus, PartItem, PartStatus } from '../types';
 import { PartsSupplierModal } from './PartsSupplierModal';
-import { AUTO_PARTS_STORES, formatPartSearchQuery } from '../services/partsStores';
+import { AUTO_PARTS_STORES, formatPartSearchQuery, buildRockAutoCatalogUrl } from '../services/partsStores';
 import { VoiceInputButton } from './VoiceInputButton';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
@@ -149,9 +149,9 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
   // Grabs active vehicle attributes (Year Make Model Engine) + specific part name,
   // normalizes query using formatPartSearchQuery,
   // copies search query to clipboard with instant visual feedback,
-  // and opens target sourcing catalog (RockAuto or Google Shopping).
+  // and opens target sourcing catalog directly on RockAuto or Google Shopping.
   const handleFindPart = (partName: string, provider: 'google' | 'rockauto' = 'rockauto') => {
-    const { fullQuery } = formatPartSearchQuery(
+    const { cleanPart, fullQuery } = formatPartSearchQuery(
       vehicle.year,
       vehicle.make,
       vehicle.model,
@@ -159,17 +159,24 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
       partName
     );
 
-    // Copy to system clipboard cleanly
-    navigator.clipboard.writeText(fullQuery).then(() => {
-      setCopiedSearchPrompt(fullQuery);
+    // Copy to system clipboard cleanly (part name for RockAuto, full query for Google Shopping)
+    const textToCopy = provider === 'rockauto' ? cleanPart : fullQuery;
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopiedSearchPrompt(textToCopy);
       setTimeout(() => setCopiedSearchPrompt(null), 3500);
     });
 
     // Open target catalog in new tab
     let targetUrl = '';
     if (provider === 'rockauto') {
-      // RockAuto search / catalog redirect
-      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`;
+      // Direct RockAuto vehicle catalog on rockauto.com!
+      targetUrl = buildRockAutoCatalogUrl(
+        vehicle.year,
+        vehicle.make,
+        vehicle.model,
+        vehicle.engine || '',
+        partName
+      );
     } else {
       // Google Shopping direct punch-out
       targetUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(fullQuery)}`;
@@ -640,7 +647,7 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
                           id={`find-part-rockauto-${part.id}`}
                           onClick={() => handleFindPart(part.part_name, 'rockauto')}
                           className="min-h-[44px] px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 text-xs border border-slate-700 transition flex items-center gap-1"
-                          title="Direct RockAuto catalog search"
+                          title="Open vehicle tree directly on rockauto.com (part name copied to clipboard)"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                           <span className="text-[10px] font-bold hidden sm:inline">RockAuto</span>

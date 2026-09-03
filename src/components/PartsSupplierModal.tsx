@@ -25,6 +25,7 @@ import {
   getCustomStores,
   deleteCustomStore,
   formatPartSearchQuery,
+  buildRockAutoCatalogUrl,
 } from '../services/partsStores';
 import { VehicleDetails } from '../types';
 import { AddCustomStoreModal } from './AddCustomStoreModal';
@@ -143,9 +144,16 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
   };
 
   const handleLaunchRockAuto = () => {
-    navigator.clipboard.writeText(fullQuery);
+    navigator.clipboard.writeText(cleanPart);
     setCopiedStore('RockAuto');
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`, '_blank', 'noopener,noreferrer');
+    const url = buildRockAutoCatalogUrl(
+      vehicle.year,
+      vehicle.make,
+      vehicle.model,
+      vehicle.engine || '',
+      partName
+    );
+    window.open(url, '_blank', 'noopener,noreferrer');
     setTimeout(() => setCopiedStore(null), 4000);
   };
 
@@ -294,7 +302,7 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
                     <ExternalLink className="w-3 h-3 text-sky-400 opacity-80" />
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1 leading-tight">
-                    Wholesale OEM &amp; aftermarket replacement parts
+                    Opens vehicle tree on rockauto.com (part name copied)
                   </p>
                 </button>
 
