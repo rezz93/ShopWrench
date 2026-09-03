@@ -11,8 +11,17 @@ import {
   X,
   AlertCircle,
   ShieldCheck,
+  Mail,
+  Lock,
+  UserPlus,
+  LogIn,
 } from 'lucide-react';
-import { loginWithGoogle, logoutUser } from '../services/firebase';
+import {
+  loginWithGoogle,
+  loginWithEmail,
+  registerWithEmail,
+  logoutUser,
+} from '../services/firebase';
 import { uploadLocalJobsToCloud } from '../services/storage';
 
 interface CloudSyncModalProps {
@@ -30,6 +39,9 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   onUserChanged,
   totalJobsCount,
 }) => {
+  const [authMode, setAuthMode] = useState<'google' | 'email-login' | 'email-signup'>('google');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
@@ -51,6 +63,49 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
       console.error('Sign-in error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
         setErrorMsg(error.message || 'Failed to sign in. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password) {
+      setErrorMsg('Please enter both email and password.');
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      let user: User;
+      if (authMode === 'email-signup') {
+        user = await registerWithEmail(email, password);
+      } else {
+        user = await loginWithEmail(email, password);
+      }
+
+      onUserChanged(user);
+      setSyncStatus('Connecting and syncing with cloud...');
+      await uploadLocalJobsToCloud(user.uid);
+      setSyncStatus('Sync complete!');
+      setTimeout(() => setSyncStatus(null), 3000);
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
+      console.error('Email auth error:', error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setErrorMsg('Invalid email or password.');
+      } else if (error.code === 'auth/email-already-in-use') {
+        setErrorMsg('Account with this email already exists. Click "Log In" instead.');
+      } else if (error.code === 'auth/weak-password') {
+        setErrorMsg('Password should be at least 6 characters.');
+      } else {
+        setErrorMsg(error.message || 'Authentication failed. Please check your credentials.');
       }
     } finally {
       setIsLoading(false);
@@ -89,7 +144,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -101,7 +156,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
                 Phone &amp; PC Cloud Sync
               </h2>
               <p className="text-xs text-slate-400">
-                Real-time synchronization across all your shop devices
+                Real-time synchronization across your shop phone &amp; PC
               </p>
             </div>
           </div>
@@ -178,7 +233,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
                 className="min-h-[44px] px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Disconnect</span>
+                <span>Sign Out</span>
               </button>
             </div>
           </div>
@@ -187,16 +242,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
               <p className="font-bold flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-amber-400" />
-                How to link your Phone and PC:
+                Log in on both your phone &amp; PC:
               </p>
               <p className="text-slate-300">
-                1. Click <strong>Sign in with Google</strong> below on this device.
-              </p>
-              <p className="text-slate-300">
-                2. Open your live app link on your phone/other PC and sign in with the same Google account.
-              </p>
-              <p className="text-slate-300">
-                3. All VIN scans, work orders, and part checklists will sync in real time between both screens automatically!
+                Use the <strong>same account</strong> (Google or Email/Password) on both devices. All your VIN scans and jobs will stay synced in real time.
               </p>
             </div>
 
@@ -207,6 +256,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
               </div>
             )}
 
+            {/* Option 1: 1-Click Google Sign-In */}
             <button
               onClick={handleGoogleSignIn}
               disabled={isLoading}
@@ -230,12 +280,101 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>{isLoading ? 'Signing In...' : 'Sign in with Google to Sync'}</span>
+              <span>{isLoading ? 'Signing In...' : 'Continue with Google'}</span>
             </button>
+
+            {/* Divider */}
+            <div className="relative flex items-center justify-center">
+              <div className="border-t border-slate-800 w-full" />
+              <span className="bg-slate-900 px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Or Use Email &amp; Password
+              </span>
+              <div className="border-t border-slate-800 w-full" />
+            </div>
+
+            {/* Option 2: Email & Password Form */}
+            <form onSubmit={handleEmailAuth} className="space-y-3">
+              <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('email-login')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                    authMode !== 'email-signup'
+                      ? 'bg-slate-800 text-amber-400 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Log In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('email-signup')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                    authMode === 'email-signup'
+                      ? 'bg-slate-800 text-amber-400 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Create New Account
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="technician@example.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full min-h-[44px] px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer border border-slate-700 disabled:opacity-50"
+              >
+                {authMode === 'email-signup' ? (
+                  <>
+                    <UserPlus className="w-4 h-4 text-amber-400" />
+                    <span>{isLoading ? 'Creating...' : 'Create Account & Start Sync'}</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4 text-amber-400" />
+                    <span>{isLoading ? 'Logging In...' : 'Log In & Start Sync'}</span>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         )}
 
-        <div className="pt-2 text-center">
+        <div className="pt-1 text-center">
           <button
             onClick={onClose}
             className="text-xs text-slate-500 hover:text-slate-300 transition cursor-pointer"

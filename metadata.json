@@ -1,5 +1,5 @@
 {
-  "name": "Mechanic VIN & Repair Job Tracker",
+  "name": "ShopWrench",
   "description": "Tactile auto repair job tracker with VIN barcode scanning, voice dictation text entry, NHTSA vehicle decoding, OBD-II diagnostics, and custom auto parts & salvage junkyard sourcing.",
   "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
