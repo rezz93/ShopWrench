@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { recognize } from 'tesseract.js';
 import {
   Camera,
   X,
@@ -20,146 +19,20 @@ import {
   ArrowRight,
   SunMedium,
   Check,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { SAMPLE_VINS } from '../services/nhtsa';
+import { parseAndCleanVin, validateVinChecksum, scoreVinCandidate } from '../utils/vinValidator';
+import { extractVinFromImage } from '../services/ocrVinService';
+
+export { parseAndCleanVin } from '../utils/vinValidator';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanSuccess: (decodedText: string) => void;
   defaultMode?: 'door-code' | 'windshield-ocr' | 'upload';
-}
-
-/**
- * Robust VIN Extraction and Normalization
- * Standard ISO 3779 VINs are 17 characters and NEVER contain I, O, or Q (to prevent confusion with 1, 0, 0).
- * Handles QR code URLs, metadata strings, barcode prefixes, and OCR ambiguities.
- */
-export function parseAndCleanVin(rawInput: string): string | null {
-  if (!rawInput) return null;
-
-  let text = rawInput.trim();
-
-  // 1. Extract VIN from URL query parameters (e.g., ?vin=... or /vin/...)
-  const urlParamMatch = text.match(/[?&/]vin[=/]([a-zA-Z0-9]{17})/i);
-  if (urlParamMatch) {
-    text = urlParamMatch[1];
-  }
-
-  // 2. Extract after explicit "VIN:" or "VIN " label
-  const labelMatch = text.match(/VIN[:\s\-#]*([a-zA-Z0-9]{17})/i);
-  if (labelMatch) {
-    text = labelMatch[1];
-  }
-
-  // 3. Extract from semicolon or comma delimited vehicle strings
-  const parts = text.split(/[;,|\n\r\t]/);
-  for (const part of parts) {
-    const cleanPart = part.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (cleanPart.length === 17 && !/[IOQ]/.test(cleanPart)) {
-      return cleanPart;
-    }
-  }
-
-  // 4. Strict 17-character regex match for valid ISO 3779 VIN format (no I, O, Q)
-  const upper = text.toUpperCase();
-  const strictMatches = upper.match(/\b([A-HJ-NPR-Z0-9]{17})\b/g);
-  if (strictMatches && strictMatches.length > 0) {
-    return strictMatches[0];
-  }
-
-  // 5. Clean string of all non-alphanumeric chars
-  const alphanumeric = upper.replace(/[^A-Z0-9]/g, '');
-
-  // Look for any exact 17-char subsegment without I, O, Q
-  for (let i = 0; i <= alphanumeric.length - 17; i++) {
-    const candidate = alphanumeric.slice(i, i + 17);
-    if (!/[IOQ]/.test(candidate)) {
-      return candidate;
-    }
-  }
-
-  // 6. Common Barcode & OCR Normalization:
-  // - GM / Ford barcodes often prepend 'I' or '1' or 'T' (making 18 chars)
-  if (alphanumeric.length === 18 && (alphanumeric.startsWith('I') || alphanumeric.startsWith('T') || alphanumeric.startsWith('1'))) {
-    const candidate17 = alphanumeric.slice(1, 18);
-    if (!/[IOQ]/.test(candidate17)) {
-      return candidate17;
-    }
-  }
-
-  // 7. Normalize typical OCR stamped-metal confusions (O->0, Q->0, I->1, S->5 in num slots)
-  const normalized = alphanumeric
-    .replace(/O/g, '0')
-    .replace(/Q/g, '0')
-    .replace(/I/g, '1');
-
-  // Look for exact 17-char subsegments in normalized stream
-  for (let i = 0; i <= normalized.length - 17; i++) {
-    const cand = normalized.slice(i, i + 17);
-    if (!/[IOQ]/.test(cand)) {
-      return cand;
-    }
-  }
-
-  // Fallback: If 17 chars long after normalization
-  if (normalized.length === 17) {
-    return normalized;
-  }
-
-  // If longer than 17 chars and starts with known WMI pattern (1, 2, 3, 4, 5, J, K, W, S, M, etc.)
-  if (normalized.length > 17) {
-    for (let i = 0; i <= normalized.length - 17; i++) {
-      const segment = normalized.slice(i, i + 17);
-      // Valid first digit of VIN is country/region code: 1-5 (North America), J (Japan), K (Korea), W (Germany), etc.
-      if (/^[1-5JKWVSMNLTR6-9]/.test(segment) && !/[IOQ]/.test(segment)) {
-        return segment;
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
- * Preprocess image on HTML5 Canvas to fight windshield glare, stamped metal artifacts, and sunlight reflection
- */
-function preprocessCanvasImage(canvas: HTMLCanvasElement, mode: 'contrast' | 'binarize' | 'normal' | 'crop_center'): string {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas.toDataURL('image/jpeg', 0.9);
-
-  if (mode === 'normal') {
-    return canvas.toDataURL('image/jpeg', 0.9);
-  }
-
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imgData.data;
-
-  // Grayscale & Contrast stretching
-  for (let i = 0; i < data.length; i += 4) {
-    // Luminance formula
-    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-
-    if (mode === 'contrast' || mode === 'crop_center') {
-      // High contrast stretch (increases contrast between stamped metal text and glass glare)
-      const contrastFactor = 1.8;
-      let enhanced = (gray - 128) * contrastFactor + 128;
-      enhanced = Math.max(0, Math.min(255, enhanced));
-      data[i] = enhanced;
-      data[i + 1] = enhanced;
-      data[i + 2] = enhanced;
-    } else if (mode === 'binarize') {
-      // Adaptive binarization threshold to eliminate soft sun reflections
-      const threshold = 130;
-      const val = gray > threshold ? 255 : 0;
-      data[i] = val;
-      data[i + 1] = val;
-      data[i + 2] = val;
-    }
-  }
-
-  ctx.putImageData(imgData, 0, 0);
-  return canvas.toDataURL('image/jpeg', 0.95);
 }
 
 export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
@@ -179,6 +52,9 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const [autoEnterCountdown, setAutoEnterCountdown] = useState<number | null>(null);
   const [isEditingManually, setIsEditingManually] = useState(false);
   const [captureSourceNotes, setCaptureSourceNotes] = useState<string>('');
+  const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
+  const [isValidChecksum, setIsValidChecksum] = useState<boolean>(false);
+  const [ocrStatusText, setOcrStatusText] = useState<string>('');
 
   // Hardware Controls
   const [hasTorch, setHasTorch] = useState(false);
@@ -364,8 +240,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
       const handleCodeDecoded = (decodedText: string) => {
         const clean = parseAndCleanVin(decodedText);
-        if (clean && clean.length >= 11) {
-          handleVinIdentified(clean, 'Scanned from Door-Jamb QR / Barcode');
+        if (clean && clean.length === 17) {
+          const isDataMatrix = /\[\)>|17V|06/i.test(decodedText);
+          const source = isDataMatrix
+            ? 'Decoded from Dashboard 2D DataMatrix'
+            : 'Scanned from Vehicle Barcode / QR';
+          handleVinIdentified(clean, source);
         }
       };
 
@@ -446,85 +326,37 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     }
   };
 
-  // OCR Processing with multi-pass filters for sunlight glare
+  // OCR Processing with Gemini Vision AI + resilient client Tesseract fallback
   const executeOcrOnImage = async (base64Data: string) => {
     setIsProcessing(true);
     setErrorMsg(null);
+    setCapturedImageUrl(base64Data);
 
     try {
-      // Create offscreen image & canvas for multi-pass glare filter
-      const img = new Image();
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = base64Data;
+      const result = await extractVinFromImage(base64Data, 'image/jpeg', (status) => {
+        setOcrStatusText(status);
       });
 
-      // Pass 1: Center-cropped reticle area (where the user aligns the metal plate)
-      // Crop to the middle 80% width and 35% height to eliminate windshield stickers, wiper blades, and glare outside the plate
-      const cropCanvas = document.createElement('canvas');
-      const cropW = Math.floor(img.width * 0.85);
-      const cropH = Math.floor(img.height * 0.40);
-      const cropX = Math.floor((img.width - cropW) / 2);
-      const cropY = Math.floor((img.height - cropH) / 2);
-
-      cropCanvas.width = cropW;
-      cropCanvas.height = cropH;
-      const cropCtx = cropCanvas.getContext('2d');
-      if (cropCtx) {
-        cropCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-        const enhancedCropUrl = preprocessCanvasImage(cropCanvas, 'contrast');
-        const cropResult = await recognize(enhancedCropUrl, 'eng');
-        const cropExtracted = parseAndCleanVin(cropResult?.data?.text || '');
-        if (cropExtracted && cropExtracted.length >= 11) {
-          handleVinIdentified(cropExtracted, 'Decoded from Windshield Plate OCR (Center Focus)');
-          return;
-        }
+      if (result && result.vin) {
+        handleVinIdentified(
+          result.vin,
+          result.source,
+          base64Data,
+          result.isValidCheckDigit
+        );
+      } else {
+        throw new Error('No valid 17-character VIN detected in image.');
       }
-
-      // Pass 2: Full frame with current glare filter
-      const fullCanvas = document.createElement('canvas');
-      fullCanvas.width = img.width;
-      fullCanvas.height = img.height;
-      const ctx = fullCanvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context failure');
-      ctx.drawImage(img, 0, 0);
-
-      const enhancedDataUrl = preprocessCanvasImage(fullCanvas, glareFilter);
-      const result = await recognize(enhancedDataUrl, 'eng');
-      const rawText = result?.data?.text || '';
-      const extracted = parseAndCleanVin(rawText);
-
-      if (extracted && extracted.length >= 11) {
-        handleVinIdentified(extracted, 'Decoded from Windshield Plate OCR');
-        return;
-      }
-
-      // Pass 3: High contrast binarization pass
-      const binarizedUrl = preprocessCanvasImage(fullCanvas, 'binarize');
-      const binarizedResult = await recognize(binarizedUrl, 'eng');
-      const binExtracted = parseAndCleanVin(binarizedResult?.data?.text || '');
-      if (binExtracted && binExtracted.length >= 11) {
-        handleVinIdentified(binExtracted, 'Decoded from Windshield Plate OCR (High Contrast)');
-        return;
-      }
-
-      // Pass 4: Fallback pass with raw image
-      const rawResult = await recognize(base64Data, 'eng');
-      const fallbackExtracted = parseAndCleanVin(rawResult?.data?.text || '');
-      if (fallbackExtracted && fallbackExtracted.length >= 11) {
-        handleVinIdentified(fallbackExtracted, 'Decoded from Windshield Plate OCR');
-        return;
-      }
-
-      throw new Error(
-        'Could not clearly read 17 digits from the windshield metal plate. Sun glare or glass reflection obscured the stamped digits. Tap "Door QR / Barcode" for instant scan, or type/speak the digits.'
-      );
     } catch (err: unknown) {
       console.error('OCR processing error:', err);
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to extract VIN from image.');
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : 'Could not extract 17-digit VIN from image. Try the "Door QR / Barcode" tab or enter manually.'
+      );
     } finally {
       setIsProcessing(false);
+      setOcrStatusText('');
     }
   };
 
@@ -568,7 +400,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   };
 
   // When VIN is identified (from QR, Barcode, or OCR)
-  const handleVinIdentified = (vin: string, source: string) => {
+  const handleVinIdentified = (
+    vin: string,
+    source: string,
+    photoUrl?: string,
+    checksumVerified?: boolean
+  ) => {
     // 1. Play haptic vibration on mobile
     try {
       navigator.vibrate?.([80, 40, 80]);
@@ -576,25 +413,38 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       // ignore
     }
 
+    const check = validateVinChecksum(vin);
+    const validCheck = checksumVerified !== undefined ? checksumVerified : check.valid;
+
     setDetectedVin(vin);
     setEditableVin(vin);
     setCaptureSourceNotes(source);
     setIsEditingManually(false);
+    setIsValidChecksum(validCheck);
+    if (photoUrl) {
+      setCapturedImageUrl(photoUrl);
+    }
 
-    // 2. Start clear 2.5-second auto-enter countdown
     clearCountdown();
-    let timeLeft = 2;
-    setAutoEnterCountdown(timeLeft);
 
-    countdownTimerRef.current = setInterval(() => {
-      timeLeft -= 1;
-      if (timeLeft <= 0) {
-        clearCountdown();
-        confirmAndSubmitVin(vin);
-      } else {
-        setAutoEnterCountdown(timeLeft);
-      }
-    }, 1000);
+    // 2. Only auto-enter if the 9th check digit is mathematically verified!
+    // If check digit is unverified, DO NOT auto-enter: give user control to confirm/edit.
+    if (validCheck) {
+      let timeLeft = 2;
+      setAutoEnterCountdown(timeLeft);
+
+      countdownTimerRef.current = setInterval(() => {
+        timeLeft -= 1;
+        if (timeLeft <= 0) {
+          clearCountdown();
+          confirmAndSubmitVin(vin);
+        } else {
+          setAutoEnterCountdown(timeLeft);
+        }
+      }, 1000);
+    } else {
+      setAutoEnterCountdown(null);
+    }
   };
 
   // Confirm and Submit VIN to main intake
@@ -704,7 +554,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
                 {isCameraActive && !detectedVin && (
                   <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4">
-                    {/* Big Square/Rectangular Reticle for QR & Barcodes */}
+                    {/* Big Square/Rectangular Reticle for QR, Barcodes & Dashboard 2D DataMatrix */}
                     <div className="w-4/5 max-w-xs h-56 border-2 border-dashed border-amber-400/90 rounded-2xl relative flex items-center justify-center bg-amber-500/5 shadow-[0_0_30px_rgba(245,158,11,0.25)]">
                       <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-amber-400 -mt-1 -ml-1 rounded-tl-lg" />
                       <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-amber-400 -mt-1 -mr-1 rounded-tr-lg" />
@@ -714,13 +564,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                       {/* Animated Scan Line */}
                       <div className="w-full h-0.5 bg-amber-400/80 absolute shadow-[0_0_12px_#fbbf24] animate-pulse" />
 
-                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 bg-slate-950/90 px-3 py-1 rounded-lg border border-amber-500/30">
-                        Aim at Door QR or Barcode
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 bg-slate-950/90 px-3 py-1 rounded-lg border border-amber-500/30 text-center">
+                        Door Barcode / QR / Dashboard DataMatrix
                       </span>
                     </div>
 
-                    <p className="mt-3 text-xs text-slate-200 bg-slate-950/90 px-3 py-1.5 rounded-full border border-slate-700 shadow-lg">
-                      Point camera 4–8 inches from sticker in driver door jamb
+                    <p className="mt-3 text-xs text-slate-200 bg-slate-950/90 px-3 py-1.5 rounded-full border border-slate-700 shadow-lg text-center max-w-xs">
+                      Point camera at driver door sticker or windshield DataMatrix
                     </p>
                   </div>
                 )}
@@ -773,7 +623,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   Take Photo with Phone Camera App
                 </h4>
                 <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
-                  For strong sun reflections or tinted windshields, snap a high-resolution photo with your phone&apos;s camera app and ShopWrench will instantly decode it.
+                  For strong sun reflections or tinted windshields, snap a crisp photo with your phone&apos;s camera app and ShopWrench AI Vision will decode it.
                 </p>
                 <button
                   type="button"
@@ -793,25 +643,43 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   <Sparkles className="w-7 h-7 animate-spin" />
                 </div>
                 <h4 className="text-lg font-black text-white">Extracting 17-Digit VIN...</h4>
-                <p className="text-xs text-amber-300 mt-1 max-w-xs leading-relaxed">
-                  Applying sunlight glare filter &amp; optical recognition to stamped digits
+                <p className="text-xs text-amber-300 mt-1 max-w-xs leading-relaxed font-medium">
+                  {ocrStatusText || 'Applying sunlight glare filter & optical recognition to stamped digits'}
                 </p>
               </div>
             )}
 
             {/* CRYSTAL CLEAR VIN CAPTURE CONFIRMATION CARD */}
             {detectedVin && (
-              <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-40 animate-in zoom-in-95 duration-150">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 mb-2 shadow-[0_0_25px_rgba(16,185,129,0.35)]">
-                  <CheckCircle2 className="w-7 h-7" />
+              <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-3 sm:p-5 text-center z-40 animate-in zoom-in-95 duration-150 overflow-y-auto">
+                {/* Checksum Status Badge */}
+                <div className="flex items-center gap-2 mb-2">
+                  {isValidChecksum ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold shadow-sm">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Verified ISO 3779 Checksum</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold shadow-sm">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Review Digits (Check Digit Unverified)</span>
+                    </span>
+                  )}
                 </div>
 
-                <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-400">
-                  VIN Code Captured!
-                </span>
+                {/* Photo preview thumbnail if captured */}
+                {capturedImageUrl && (
+                  <div className="w-full max-w-sm max-h-24 sm:max-h-28 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 shadow-md mb-2 flex items-center justify-center">
+                    <img
+                      src={capturedImageUrl}
+                      alt="Captured VIN plate"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
 
                 {/* Editable Monospace VIN Display */}
-                <div className="w-full max-w-md my-2.5">
+                <div className="w-full max-w-md my-1.5">
                   <div className="relative">
                     <input
                       type="text"
@@ -820,18 +688,22 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                       onChange={(e) => {
                         clearCountdown();
                         setIsEditingManually(true);
-                        setEditableVin(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                        const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        setEditableVin(val);
+                        const check = validateVinChecksum(val);
+                        setIsValidChecksum(check.valid);
                       }}
-                      className="w-full text-center font-mono text-xl sm:text-2xl font-black tracking-widest text-white bg-slate-900 border-2 border-emerald-500/80 rounded-xl py-3 px-3 shadow-inner focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      className={`w-full text-center font-mono text-xl sm:text-2xl font-black tracking-widest text-white bg-slate-900 border-2 ${
+                        isValidChecksum ? 'border-emerald-500/80 focus:ring-emerald-400' : 'border-amber-500/80 focus:ring-amber-400'
+                      } rounded-xl py-2.5 px-3 shadow-inner focus:outline-none focus:ring-2`}
                     />
-                    <Edit3 className="w-4 h-4 text-emerald-400/60 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Edit3 className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
 
-                  <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-center gap-1">
-                    <span>{captureSourceNotes}</span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-amber-400">Tap digits above to fix any letter</span>
-                  </p>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1 px-1">
+                    <span className="truncate max-w-[220px]">{captureSourceNotes}</span>
+                    <span className="font-mono font-bold text-slate-300">{editableVin.length}/17</span>
+                  </div>
                 </div>
 
                 {/* Auto-Enter Countdown or Manual Confirmation Actions */}
@@ -839,7 +711,8 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => confirmAndSubmitVin(editableVin)}
-                    className="w-full min-h-[48px] px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer transition"
+                    disabled={editableVin.length !== 17}
+                    className="w-full min-h-[48px] px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 disabled:opacity-50 text-slate-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer transition"
                   >
                     <Check className="w-5 h-5 stroke-[3]" />
                     <span>
@@ -856,6 +729,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                         clearCountdown();
                         setDetectedVin(null);
                         setEditableVin('');
+                        setCapturedImageUrl(null);
                         if (activeTab === 'door-code') startDoorScanner();
                         else if (activeTab === 'windshield-ocr') startWindshieldCamera();
                       }}
@@ -943,16 +817,27 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
               {/* Action Buttons for Windshield OCR Mode */}
               {activeTab === 'windshield-ocr' && (
-                <button
-                  type="button"
-                  id="snap-windshield-btn"
-                  onClick={handleSnapWindshieldPhoto}
-                  disabled={isProcessing}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Snap Plate Photo</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+                    title="Upload or snap with native phone camera"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline">Phone Cam / Upload</span>
+                  </button>
+                  <button
+                    type="button"
+                    id="snap-windshield-btn"
+                    onClick={handleSnapWindshieldPhoto}
+                    disabled={isProcessing}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Snap Plate Photo</span>
+                  </button>
+                </div>
               )}
             </div>
           )}

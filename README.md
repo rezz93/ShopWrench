@@ -96,10 +96,11 @@ Here is a step-by-step example of how to check in a vehicle and manage a repair 
 
 ### Step 2: Enter the VIN (Vehicle Identification Number)
 Choose whichever method is fastest for you:
-- **Option A (Barcode Scanner - Easiest on phone)**:
-  - Tap **"Scan Barcode"**.
-  - Point your phone camera at the 17-character barcode on the driver's door jamb sticker.
-  - The scanner beeps, captures the VIN, and automatically starts decoding it.
+- **Option A (Scanner - Easiest on phone)**:
+  - Tap **"Scan Barcode / OCR"**.
+  - **Door Jamb Sticker**: Aim the camera at the barcode or square QR code on the driver's door pillar.
+  - **Dashboard Plate / Windshield (New!)**: Switch to the **"Windshield OCR"** tab. Position the camera over the metal stamped VIN plate visible in the lower driver's corner of the windshield, tap the anti-glare filter if sun reflections are harsh, and tap **"Snap Plate Photo"**.
+  - **Phone Photo / Gallery**: Switch to the **"Upload / Phone Cam"** tab to snap a crisp photo using your phone's native camera app. ShopWrench's AI Vision automatically reads the 17 characters, checks the mathematical ISO checksum, and highlights any characters for review.
 - **Option B (Voice VIN - When your hands are greasy)**:
   - Tap **"Voice VIN"** and speak the 17 letters and numbers clearly (e.g., *"One G T E..."*).
 - **Option C (Type Manually)**:
@@ -196,10 +197,13 @@ As parts move through your shop, tap the status pill for each part:
 
 ## 💡 Troubleshooting & Helpful Tips
 
-### Barcode Scanning
-- **Lighting**: If the door jamb is dark or under a car lift, turn on your phone's flashlight or hold a work light near the barcode.
-- **Distance**: Hold your phone camera about 4 to 8 inches away from the barcode so the red guideline is centered over the lines.
-- **Worn Stickers**: If a door jamb sticker is torn or faded, use **Voice VIN** or type the VIN from the lower corner of the front windshield.
+### Barcode & Dashboard VIN Scanning
+- **Door Jamb Sticker**: Hold your phone camera about 4 to 8 inches away from the sticker so the red guideline is centered over the barcode or QR code. If it's dark in the shop bay, tap the **Flash ON** button.
+- **Dashboard Metal Plate & Windshield**:
+  - Point your camera through the lower driver's side corner of the windshield.
+  - If direct sunlight creates reflections on the glass, tap the **Filter** button to toggle **Anti-Glare** or **B&W Sharp** filters, or tap **Snap Plate Photo**.
+  - **Phone Camera Quality**: You can also tap **"Phone Cam / Upload"** to snap a photo with your phone's native camera app. Native camera apps often have superior optical HDR and macro focus for small stamped metal plates.
+- **Worn or Damaged Stickers**: If a sticker is completely unreadable, use **Voice VIN** to dictate the 17 characters hands-free or type the digits. ShopWrench verifies the 9th check digit to make sure no letters or numbers were mistyped.
 
 ### Cloud Sync & Login
 - **Same Account**: Ensure both your phone and PC are logged into the **same Google account or email address**.

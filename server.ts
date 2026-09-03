@@ -50,18 +50,22 @@ async function startServer() {
 
       const ai = getGeminiClient();
 
-      const prompt = `You are a vehicle intake and VIN OCR extraction specialist for an automotive repair shop.
-The user has photographed a vehicle VIN plate, which may be located on:
-1. The dashboard viewed through the lower driver-side windshield (metal plate or stamped text).
-2. The vehicle door-jamb sticker.
+      const prompt = `You are an elite automotive vehicle intake and VIN OCR extraction specialist for an automotive repair shop.
+The user has photographed a vehicle VIN plate, which is commonly:
+1. The dashboard metal plate viewed through the lower driver-side windshield corner.
+2. The vehicle driver door-jamb sticker or B-pillar label.
 3. Vehicle registration / title / work order document.
 
-Analyze the image carefully:
-- Find and extract the 17-character Vehicle Identification Number (VIN).
-- Standard North American / ISO VINs are exactly 17 characters long, containing capital letters and numbers (excluding letters I, O, and Q to prevent confusion with 1, 0).
-- If characters are partially obscured or reflective due to windshield glass, apply automotive VIN OCR correction (e.g. O -> 0, I -> 1, Q -> 0).
-- Return the cleaned 17-character VIN in uppercase without spaces, hyphens, or extra symbols.
-- If you find multiple numbers or text, pick the one that matches standard 17-character automotive VIN structure. If no 17-character VIN is identifiable, extract the closest candidate.`;
+CRITICAL INSTRUCTIONS FOR DASHBOARD WINDSHIELD PLATES:
+- Automotive dashboard VIN plates (such as General Motors, Ford, Ram/Chrysler, Toyota, Honda) frequently feature a manufacturer logo (e.g. the letters "GM" inside a square) or a small square 2D DataMatrix barcode on the far-left edge of the plate recess.
+- DO NOT treat the "GM" logo or barcode symbols as part of the VIN! The VIN is the 17-character sequence printed directly beside it (for example: "1GTH6BEN9J1101728").
+- Standard ISO 3779 / NHTSA VIN rules:
+  * Exactly 17 characters long.
+  * Letters I, O, and Q are NEVER present in valid VINs. If a character looks like I/O/Q, it is 1 or 0.
+  * The 9th digit is an ISO 3779 mathematical check digit.
+  * For North American vehicles (starting with 1, 2, 3, 4, or 5), positions 12 through 17 are ALWAYS numeric serial digits.
+- Windshield reflections: If the photo has sunlight glare, reflections of the photographer/phone, or glass tint, focus directly on the stamped characters embossed or printed on the recessed metal plate.
+- Return the cleaned 17-character VIN in uppercase without spaces, hyphens, or extra symbols.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
@@ -117,6 +121,13 @@ Analyze the image carefully:
       // Clean extracted VIN string
       if (result.vin) {
         result.vin = result.vin.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        // Strip accidental GM logo or 17V prefix if model included it
+        if (result.vin.length > 17) {
+          const match17 = result.vin.match(/(?:17V|GM)?([A-HJ-NPR-Z0-9]{17})/);
+          if (match17) {
+            result.vin = match17[1];
+          }
+        }
       }
 
       return res.json({
