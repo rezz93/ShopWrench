@@ -6,15 +6,16 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.3.0',
+  version: '1.4.0',
   releaseDate: '2026-09-03',
-  build: 'rev-2026.09.03-p1',
+  build: 'rev-2026.09.03-p2',
   changes: [
-    'Fixed Speak VIN voice recognition with phonetic & NATO alphabet parsing',
-    'Enhanced windshield plate OCR with center reticle crop and glare filters',
-    'Full 2D QR Code & Data Matrix door sticker decoder',
-    'Integrated version tracking and Firebase project connection diagnostics',
-    'Multi-device real-time sync between shop mobile phone & desktop'
+    'Vehicle and part details carry-over for AutoZone, O\'Reilly, and Advance Auto Parts',
+    'Direct Product Link (Bypass Redirect) for immediate indexed store results',
+    'Automatic search query copy to clipboard for rapid 1-click paste into parts sites',
+    'Standardized mechanic shorthand terms (e.g. temp sensor -> Engine Coolant Temperature Sensor)',
+    '1-Click Google Shopping price comparison across all retail suppliers',
+    'Multi-device real-time sync with Firebase cloud database'
   ]
 };
 
