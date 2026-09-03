@@ -1,6 +1,7 @@
 import React from 'react';
 import { User } from 'firebase/auth';
 import { Wrench, Car, Plus, Cloud, Activity } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   activeTab: 'ledger' | 'intake' | 'workspace' | 'obd';
@@ -51,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Car className="w-4 h-4" />
-            <span>Active Jobs Ledger</span>
+            <span>Active Jobs</span>
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                 activeTab === 'ledger' || activeTab === 'workspace'
@@ -73,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>New Intake Scanner</span>
+            <span>New Intake</span>
           </button>
 
           <button
@@ -90,8 +91,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* System Status & Cloud Sync Button */}
+        {/* System Status, PWA Install & Cloud Sync Button */}
         <div className="flex items-center gap-2">
+          {/* In-App PWA Install Prompt */}
+          <PWAInstallButton />
+
+          {/* Cloud Sync Button */}
           <button
             id="btn-cloud-sync"
             onClick={onOpenCloudSync}
