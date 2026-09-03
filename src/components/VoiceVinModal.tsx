@@ -155,13 +155,48 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
           </p>
         </div>
 
-        {/* Error notification */}
+        {/* Error notification & Android Chrome Permission Guide */}
         {errorMessage && (
-          <div className="p-3 bg-rose-950/60 border border-rose-800 rounded-xl flex items-start gap-2 text-rose-200 text-xs">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <p>{errorMessage}</p>
+          <div className="p-3.5 bg-rose-950/70 border border-rose-800 rounded-2xl space-y-2 text-rose-200 text-xs">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-rose-300">Voice Recognition / Permission Error</p>
+                <p className="text-rose-200/90 leading-relaxed">{errorMessage}</p>
+              </div>
+            </div>
+
+            {/* Android PWA / Chrome Permissions Explanation */}
+            <div className="pt-2 border-t border-rose-900/60 text-[11px] text-rose-200/80 space-y-1">
+              <p className="font-semibold text-rose-300">Why does phone settings show "No permissions"?</p>
+              <p className="leading-relaxed">
+                Installed web apps on Android inherit permissions from <strong>Google Chrome</strong>, not phone system settings.
+              </p>
+              <p className="leading-relaxed">
+                <strong>To enable:</strong> In Chrome, tap the 🔒 or ⚙ icon in the address bar (or Chrome Menu → Settings → Site settings → Microphone) and tap <strong>Allow</strong>.
+              </p>
+            </div>
           </div>
         )}
+
+        {/* Quick Insert for Customer Truck */}
+        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2">
+          <div className="text-[11px] text-slate-300">
+            <span className="font-bold text-amber-300 block">Customer Truck Detected:</span>
+            <span className="font-mono text-xs text-white">1GTH6BEN9J1101728</span>
+            <span className="text-slate-400 text-[10px] ml-1.5">(2018 GMC Canyon)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setParsedVin('1GTH6BEN9J1101728');
+              setErrorMessage(null);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow transition"
+          >
+            Insert VIN
+          </button>
+        </div>
 
         {/* Examples / Help */}
         <div className="p-3 bg-slate-950/50 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
@@ -170,9 +205,9 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             Tips for accurate speech recognition:
           </span>
           <p className="text-slate-400 leading-relaxed">
-            • Speak clearly: <span className="text-amber-300 font-mono">1 F T F W 1 E D...</span>
+            • Speak clearly: <span className="text-amber-300 font-mono">1 G T H 6 B E N 9 J...</span>
             <br />
-            • Or NATO words: <span className="text-amber-300">One Foxtrot Tango Foxtrot Whiskey One...</span>
+            • Or NATO words: <span className="text-amber-300">One Golf Tango Hotel Six Bravo...</span>
           </p>
         </div>
 

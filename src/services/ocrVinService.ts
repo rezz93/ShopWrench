@@ -58,8 +58,45 @@ export function preprocessOcrCanvas(
 }
 
 /**
+ * Scales down large mobile phone camera photos (which can be 12-48MP / 15MB)
+ * to an optimal OCR size (~1600px max dimension, ~250KB).
+ * This ensures lightning-fast upload without network timeouts over cellular connections.
+ */
+export async function resizeImageForOcr(dataUrl: string, maxDim = 1600): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim) {
+        resolve(dataUrl);
+        return;
+      }
+      if (width > height) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Executes a high-accuracy, 2-tier OCR extraction:
- * 1. Primary: Server-side Gemini 3.8 Flash Vision OCR via /api/ocr-vin (best for windshield glare & reflections)
+ * 1. Primary: Server-side Gemini Vision OCR via /api/ocr-vin (best for windshield glare & reflections)
  * 2. Secondary: Tuned client-side Tesseract.js (strictly whitelisted, no dictionary hallucination, for offline/static GitHub Pages)
  */
 export async function extractVinFromImage(
@@ -71,15 +108,18 @@ export async function extractVinFromImage(
   // TIER 1: Server-Side AI Vision OCR (/api/ocr-vin)
   // -------------------------------------------------------------
   try {
-    onStatusUpdate?.('Analyzing windshield plate with Gemini Vision AI...');
+    onStatusUpdate?.('Optimizing photo & analyzing windshield plate with AI Vision...');
+
+    // Resize image for fast mobile upload and optimal model attention
+    const optimizedBase64 = await resizeImageForOcr(base64Data, 1600);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     const res = await fetch('/api/ocr-vin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: base64Data, mimeType }),
+      body: JSON.stringify({ imageBase64: optimizedBase64, mimeType: 'image/jpeg' }),
       signal: controller.signal,
     });
 

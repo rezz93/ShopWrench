@@ -842,13 +842,42 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             </div>
           )}
 
-          {/* Error Notice */}
+          {/* Error Notice & Permission Resolver */}
           {errorMsg && (
-            <div className="w-full p-3 bg-rose-950/60 border border-rose-800 rounded-xl flex items-start gap-2.5 text-rose-200 text-xs">
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-rose-300">Scanner Notice</p>
-                <p className="mt-0.5 text-rose-200/90 leading-relaxed">{errorMsg}</p>
+            <div className="w-full p-3.5 bg-rose-950/70 border border-rose-800 rounded-xl space-y-2.5 text-rose-200 text-xs">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-rose-300">Scanner / Camera Notice</p>
+                  <p className="mt-0.5 text-rose-200/90 leading-relaxed">{errorMsg}</p>
+                </div>
+              </div>
+
+              {/* Instant No-Permission Workaround Button */}
+              <div className="pt-2 border-t border-rose-900/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Take Photo with Phone Camera (No Permissions Needed)</span>
+                </button>
+
+                <p className="text-[10px] text-rose-300 sm:text-right">
+                  Native camera works even if browser permissions are denied
+                </p>
+              </div>
+
+              {/* Android WebAPK / Chrome Permissions Guide */}
+              <div className="p-2 bg-slate-950/80 rounded-lg border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                <p className="font-bold text-amber-300">Why does Android Settings show "No permissions requested"?</p>
+                <p className="text-slate-400 leading-relaxed">
+                  Installed web apps on Android inherit permissions from <strong>Google Chrome</strong>:
+                </p>
+                <p className="text-slate-300 leading-relaxed font-mono text-[10px]">
+                  Chrome Address Bar → Tap 🔒 or ⚙ (Page info) → Permissions → Allow Camera &amp; Mic
+                </p>
               </div>
             </div>
           )}

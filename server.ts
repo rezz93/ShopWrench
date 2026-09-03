@@ -57,60 +57,82 @@ The user has photographed a vehicle VIN plate, which is commonly:
 3. Vehicle registration / title / work order document.
 
 CRITICAL INSTRUCTIONS FOR DASHBOARD WINDSHIELD PLATES:
-- Automotive dashboard VIN plates (such as General Motors, Ford, Ram/Chrysler, Toyota, Honda) frequently feature a manufacturer logo (e.g. the letters "GM" inside a square) or a small square 2D DataMatrix barcode on the far-left edge of the plate recess.
-- DO NOT treat the "GM" logo or barcode symbols as part of the VIN! The VIN is the 17-character sequence printed directly beside it (for example: "1GTH6BEN9J1101728").
+- Automotive dashboard VIN plates (especially General Motors / GMC / Chevrolet / Ford / Ram / Toyota) frequently feature:
+  * A small square 2D DataMatrix barcode on the far left.
+  * A manufacturer logo emblem (such as "GM" inside a square) immediately beside the 2D code.
+  * The actual 17-character VIN printed or stamped directly to the right of the GM logo (e.g. "1GTH6BEN9J1101728").
+- DO NOT include the "GM" logo letters or barcode headers in the VIN!
 - Standard ISO 3779 / NHTSA VIN rules:
   * Exactly 17 characters long.
-  * Letters I, O, and Q are NEVER present in valid VINs. If a character looks like I/O/Q, it is 1 or 0.
-  * The 9th digit is an ISO 3779 mathematical check digit.
-  * For North American vehicles (starting with 1, 2, 3, 4, or 5), positions 12 through 17 are ALWAYS numeric serial digits.
-- Windshield reflections: If the photo has sunlight glare, reflections of the photographer/phone, or glass tint, focus directly on the stamped characters embossed or printed on the recessed metal plate.
-- Return the cleaned 17-character VIN in uppercase without spaces, hyphens, or extra symbols.`;
+  * Letters I, O, and Q are NEVER present in valid VINs. If a character looks like I or O or Q, it is 1 or 0.
+  * The 9th digit is an ISO 3779 mathematical check digit (0-9 or X).
+  * The 10th digit is the Model Year (e.g., J = 2018, K = 2019, L = 2020, etc.).
+  * For North American vehicles (starting with 1, 2, 3, 4, or 5), positions 12 through 17 are ALWAYS numeric serial digits (e.g. 1101728).
+- Windshield reflections: If the photo has sunlight glare, reflections of the photographer/phone, or glass tint, ignore reflections and focus directly on the stamped characters embossed or printed on the recessed metal plate.
+- Look at the image carefully and return the cleaned 17-character VIN in uppercase without spaces, hyphens, or extra symbols.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
+      const modelsToTry = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
+      let response: any = null;
+      let lastErr: any = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: [
               {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: cleanBase64,
-                },
-              },
-              {
-                text: prompt,
+                role: 'user',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: cleanBase64,
+                    },
+                  },
+                  {
+                    text: prompt,
+                  },
+                ],
               },
             ],
-          },
-        ],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              vin: {
-                type: Type.STRING,
-                description: 'The extracted 17-character VIN in uppercase, or empty string if not found',
-              },
-              confidence: {
-                type: Type.STRING,
-                description: 'high, medium, or low',
-              },
-              detectedLocation: {
-                type: Type.STRING,
-                description: 'dashboard_windshield, door_jamb, document, or unknown',
-              },
-              notes: {
-                type: Type.STRING,
-                description: 'Brief explanation of characters identified or any corrections made',
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  vin: {
+                    type: Type.STRING,
+                    description: 'The extracted 17-character VIN in uppercase, or empty string if not found',
+                  },
+                  confidence: {
+                    type: Type.STRING,
+                    description: 'high, medium, or low',
+                  },
+                  detectedLocation: {
+                    type: Type.STRING,
+                    description: 'dashboard_windshield, door_jamb, document, or unknown',
+                  },
+                  notes: {
+                    type: Type.STRING,
+                    description: 'Brief explanation of characters identified or any corrections made',
+                  },
+                },
+                required: ['vin', 'confidence'],
               },
             },
-            required: ['vin', 'confidence'],
-          },
-        },
-      });
+          });
+          if (response?.text) {
+            break;
+          }
+        } catch (mErr: any) {
+          lastErr = mErr;
+          console.warn(`Model ${modelName} failed for OCR VIN:`, mErr?.message || mErr);
+        }
+      }
+
+      if (!response?.text) {
+        throw lastErr || new Error('All AI vision models were temporarily unavailable.');
+      }
 
       const text = response.text;
       if (!text) {

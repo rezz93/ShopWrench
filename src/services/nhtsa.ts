@@ -2,6 +2,11 @@ import { DecodeVinResponse } from '../types';
 
 export const SAMPLE_VINS = [
   {
+    vin: '1GTH6BEN9J1101728',
+    label: '2018 GMC Canyon 3.6L 4WD',
+    desc: 'Customer Truck - Work Truck V6',
+  },
+  {
     vin: '1FTFW1ED4MFA12345',
     label: '2021 Ford F-150 3.5L 4WD',
     desc: 'Truck - 4WD V6',
