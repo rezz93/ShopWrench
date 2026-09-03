@@ -7,10 +7,11 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.1',
+  version: '1.4.2',
   releaseDate: '2026-09-03',
-  build: 'rev-2026.09.03-p3',
+  build: 'rev-2026.09.03-p4',
   changes: [
+    'Comprehensive layman README.md guide for phone and PC setup, login, and step-by-step job example',
     'Direct rockauto.com vehicle catalog navigation (opens directly on rockauto.com, bypassing Google search)',
     'Part name auto-copied to clipboard for instant search/filtering on RockAuto',
     'Vehicle and part details carry-over for AutoZone, O\'Reilly, and Advance Auto Parts',
