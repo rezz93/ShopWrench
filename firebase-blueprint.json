@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "Job": {
+      "collection": "jobs",
+      "fields": {
+        "userId": { "type": "string", "description": "ID of the technician who owns the job" },
+        "customer_name": { "type": "string", "description": "Customer name" },
+        "vin": { "type": "string", "description": "17-character VIN" },
+        "status": { "type": "string", "description": "Job status: In Progress, Waiting on Parts, Completed" },
+        "vehicle_details": { "type": "map", "description": "Vehicle specs decoded from NHTSA" },
+        "parts_list": { "type": "list", "description": "Parts list and their statuses" },
+        "service_notes": { "type": "string", "description": "Technician diagnosis and notes" },
+        "created_at": { "type": "string", "description": "ISO creation timestamp" },
+        "updated_at": { "type": "string", "description": "ISO last updated timestamp" }
+      }
+    },
+    "CustomStore": {
+      "collection": "custom_stores",
+      "fields": {
+        "userId": { "type": "string", "description": "ID of the user who owns this custom store" },
+        "name": { "type": "string", "description": "Store name" },
+        "searchUrl": { "type": "string", "description": "URL template for part searches" },
+        "category": { "type": "string", "description": "junkyard, supplier, or aftermarket" }
+      }
+    }
+  }
+}

@@ -1,37 +1,71 @@
 import React, { useEffect, useState } from 'react';
+import { User } from 'firebase/auth';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { JobsLedger } from './components/JobsLedger';
 import { VinIntakeScanner } from './components/VinIntakeScanner';
 import { JobWorkspace } from './components/JobWorkspace';
 import { ObdLookupView } from './components/ObdLookupView';
-import { getStoredJobs, saveJobs, addPartToJob, updateJob, deleteJob } from './services/storage';
+import { CloudSyncModal } from './components/CloudSyncModal';
+import {
+  getStoredJobs,
+  addPartToJob,
+  updateJob,
+  deleteJob,
+  setupRealtimeSync,
+} from './services/storage';
+import { auth, onAuthStateChanged } from './services/firebase';
 import { Job } from './types';
-import { Wrench, RotateCcw, ShieldCheck, Database, Check } from 'lucide-react';
+import { Wrench, RotateCcw, Database, Cloud } from 'lucide-react';
 
 export default function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeTab, setActiveTab] = useState<'ledger' | 'intake' | 'workspace' | 'obd'>('ledger');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
 
-  // Load jobs from storage on mount
+  // Initialize and listen to Auth state + Cloud Sync
   useEffect(() => {
-    const loaded = getStoredJobs();
-    setJobs(loaded);
+    // 1. Initial local load
+    setJobs(getStoredJobs());
 
+    // 2. Local storage event listener
     const handleStorageUpdate = () => {
       setJobs(getStoredJobs());
     };
-
     window.addEventListener('autoshop_jobs_updated', handleStorageUpdate);
+
+    // 3. Firebase Auth listener
+    let unsubscribeSync: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (unsubscribeSync) {
+        unsubscribeSync();
+        unsubscribeSync = null;
+      }
+
+      if (user) {
+        // Connected to Cloud: subscribe to real-time updates
+        unsubscribeSync = setupRealtimeSync(user.uid, (cloudJobs) => {
+          setJobs(cloudJobs);
+        });
+      } else {
+        // Local mode
+        setJobs(getStoredJobs());
+      }
+    });
+
     return () => {
       window.removeEventListener('autoshop_jobs_updated', handleStorageUpdate);
+      unsubscribeAuth();
+      if (unsubscribeSync) unsubscribeSync();
     };
   }, []);
 
   const refreshJobs = () => {
-    const current = getStoredJobs();
-    setJobs(current);
+    setJobs(getStoredJobs());
   };
 
   const handleJobCreated = (newJob: Job) => {
@@ -51,7 +85,7 @@ export default function App() {
     refreshJobs();
   };
 
-  const handleJobUpdated = (updated: Job) => {
+  const handleJobUpdated = (_updated: Job) => {
     refreshJobs();
   };
 
@@ -90,6 +124,8 @@ export default function App() {
           if (tab === 'ledger') setSelectedJobId(null);
         }}
         activeJobsCount={activeJobsCount}
+        currentUser={currentUser}
+        onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
       />
 
       {/* Main Workspace Body */}
@@ -144,18 +180,33 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer info (Single user notice & ergonomics) */}
+      {/* Footer info & Cloud Sync quick status */}
       <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-xs text-slate-500 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Wrench className="w-4 h-4 text-amber-500" />
-          <span>ShopWrench Tactile Tech Console • Zero login single-user workspace</span>
+          <span>ShopWrench Tactile Tech Console</span>
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1 text-slate-400">
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Local Database Active</span>
-          </span>
+          <button
+            onClick={() => setIsCloudSyncModalOpen(true)}
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition cursor-pointer"
+          >
+            {currentUser ? (
+              <>
+                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-400 font-medium">
+                  Cloud Synced ({currentUser.email || 'Google User'})
+                </span>
+              </>
+            ) : (
+              <>
+                <Database className="w-3.5 h-3.5 text-amber-400" />
+                <span>Local Only • Tap to Sync Phone &amp; PC</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={() => {
               if (window.confirm('Reset all repair jobs to default shop demo data?')) {
@@ -171,7 +222,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Persistent Mobile Bottom Navigation (Milestone 1) */}
+      {/* Persistent Mobile Bottom Navigation */}
       <BottomNav
         activeTab={activeTab}
         setActiveTab={(tab) => {
@@ -179,6 +230,18 @@ export default function App() {
           if (tab === 'ledger') setSelectedJobId(null);
         }}
         activeJobsCount={activeJobsCount}
+      />
+
+      {/* Cloud Sync Modal */}
+      <CloudSyncModal
+        isOpen={isCloudSyncModalOpen}
+        onClose={() => setIsCloudSyncModalOpen(false)}
+        currentUser={currentUser}
+        onUserChanged={(user) => {
+          setCurrentUser(user);
+          refreshJobs();
+        }}
+        totalJobsCount={jobs.length}
       />
     </div>
   );

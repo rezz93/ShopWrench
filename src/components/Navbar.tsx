@@ -1,16 +1,21 @@
 import React from 'react';
-import { Wrench, Car, Plus, ShieldCheck, Activity } from 'lucide-react';
+import { User } from 'firebase/auth';
+import { Wrench, Car, Plus, Cloud, Activity } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'ledger' | 'intake' | 'workspace' | 'obd';
   setActiveTab: (tab: 'ledger' | 'intake' | 'obd') => void;
   activeJobsCount: number;
+  currentUser: User | null;
+  onOpenCloudSync: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   activeJobsCount,
+  currentUser,
+  onOpenCloudSync,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
@@ -34,7 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Desktop Navigation Tabs (Milestone 1) */}
+        {/* Desktop Navigation Tabs */}
         <div className="hidden md:flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
           <button
             id="nav-tab-ledger"
@@ -85,18 +90,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* System Status Pill */}
+        {/* System Status & Cloud Sync Button */}
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>NHTSA API Online</span>
-          </div>
-
-          <div className="flex items-center gap-1 text-xs text-slate-400 bg-slate-900/60 px-2.5 py-1.5 rounded-lg border border-slate-800">
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline font-mono">Single-User</span>
-            <span className="font-mono text-emerald-400 font-bold">Local</span>
-          </div>
+          <button
+            id="btn-cloud-sync"
+            onClick={onOpenCloudSync}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
+              currentUser
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+            }`}
+            title="Configure Phone & PC Sync"
+          >
+            <Cloud className={`w-4 h-4 ${currentUser ? 'text-emerald-400' : 'text-amber-400'}`} />
+            <span className="hidden sm:inline">
+              {currentUser ? 'Cloud Synced' : 'Sync Phone & PC'}
+            </span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                currentUser ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+          </button>
         </div>
       </div>
     </header>

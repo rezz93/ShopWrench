@@ -1,4 +1,14 @@
 import { Job, PartItem, JobStatus, PartStatus, VehicleDetails } from '../types';
+import {
+  auth,
+  db,
+  doc,
+  setDoc,
+  deleteDoc,
+  collection,
+  onSnapshot,
+  getDocs,
+} from './firebase';
 
 const STORAGE_KEY = 'autoshop_jobs_v1';
 
@@ -110,18 +120,25 @@ const INITIAL_JOBS: Job[] = [
   },
 ];
 
+// In-memory cache
+let cachedJobs: Job[] | null = null;
+
 export function getStoredJobs(): Job[] {
+  if (cachedJobs) return cachedJobs;
   if (typeof window === 'undefined') return INITIAL_JOBS;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_JOBS));
+      cachedJobs = INITIAL_JOBS;
       return INITIAL_JOBS;
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
+      cachedJobs = parsed;
       return parsed;
     }
+    cachedJobs = INITIAL_JOBS;
     return INITIAL_JOBS;
   } catch (err) {
     console.error('Failed to read stored jobs:', err);
@@ -129,13 +146,42 @@ export function getStoredJobs(): Job[] {
   }
 }
 
-export function saveJobs(jobs: Job[]): void {
+export function saveJobs(jobs: Job[], skipCloud = false): void {
+  cachedJobs = jobs;
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
     window.dispatchEvent(new Event('autoshop_jobs_updated'));
   } catch (err) {
     console.error('Failed to save jobs to storage:', err);
+  }
+}
+
+// Write a single job to Firestore if user is authenticated
+async function syncJobToFirestore(job: Job): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    const jobRef = doc(db, 'users', user.uid, 'jobs', job.id);
+    await setDoc(jobRef, {
+      ...job,
+      userId: user.uid,
+      syncedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.error('Error syncing job to Firestore:', err);
+  }
+}
+
+// Delete a single job from Firestore if user is authenticated
+async function deleteJobFromFirestore(jobId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    const jobRef = doc(db, 'users', user.uid, 'jobs', jobId);
+    await deleteDoc(jobRef);
+  } catch (err) {
+    console.error('Error deleting job from Firestore:', err);
   }
 }
 
@@ -165,6 +211,10 @@ export function createNewJob(params: {
   const current = getStoredJobs();
   const updated = [newJob, ...current];
   saveJobs(updated);
+
+  // Sync to Cloud in background
+  syncJobToFirestore(newJob);
+
   return newJob;
 }
 
@@ -181,6 +231,10 @@ export function updateJob(id: string, updates: Partial<Job>): Job | null {
 
   current[index] = updatedJob;
   saveJobs(current);
+
+  // Sync to Cloud in background
+  syncJobToFirestore(updatedJob);
+
   return updatedJob;
 }
 
@@ -188,6 +242,9 @@ export function deleteJob(id: string): void {
   const current = getStoredJobs();
   const filtered = current.filter((j) => j.id !== id);
   saveJobs(filtered);
+
+  // Delete from Cloud in background
+  deleteJobFromFirestore(id);
 }
 
 export function deleteMultipleJobs(ids: string[]): void {
@@ -195,14 +252,18 @@ export function deleteMultipleJobs(ids: string[]): void {
   const idSet = new Set(ids);
   const filtered = current.filter((j) => !idSet.has(j.id));
   saveJobs(filtered);
+
+  ids.forEach((id) => deleteJobFromFirestore(id));
 }
 
 export function deleteCompletedJobs(): number {
   const current = getStoredJobs();
-  const completedCount = current.filter((j) => j.status === 'Completed').length;
+  const completedJobs = current.filter((j) => j.status === 'Completed');
   const filtered = current.filter((j) => j.status !== 'Completed');
   saveJobs(filtered);
-  return completedCount;
+
+  completedJobs.forEach((j) => deleteJobFromFirestore(j.id));
+  return completedJobs.length;
 }
 
 export function addPartToJob(jobId: string, partName: string): PartItem | null {
@@ -223,6 +284,8 @@ export function addPartToJob(jobId: string, partName: string): PartItem | null {
   current[index].parts_list = [...current[index].parts_list, newPart];
   current[index].updated_at = new Date().toISOString();
   saveJobs(current);
+
+  syncJobToFirestore(current[index]);
   return newPart;
 }
 
@@ -237,6 +300,8 @@ export function updatePartStatus(jobId: string, partId: string, nextStatus: Part
   current[jobIdx].parts_list[partIdx].status = nextStatus;
   current[jobIdx].updated_at = new Date().toISOString();
   saveJobs(current);
+
+  syncJobToFirestore(current[jobIdx]);
   return true;
 }
 
@@ -248,6 +313,8 @@ export function deletePartFromJob(jobId: string, partId: string): boolean {
   current[jobIdx].parts_list = current[jobIdx].parts_list.filter((p) => p.id !== partId);
   current[jobIdx].updated_at = new Date().toISOString();
   saveJobs(current);
+
+  syncJobToFirestore(current[jobIdx]);
   return true;
 }
 
@@ -255,4 +322,63 @@ export function cyclePartStatus(currentStatus: PartStatus): PartStatus {
   if (currentStatus === 'Needed') return 'Ordered';
   if (currentStatus === 'Ordered') return 'Arrived';
   return 'Needed';
+}
+
+// Upload all local jobs to the user's cloud account when they sign in
+export async function uploadLocalJobsToCloud(userId: string): Promise<number> {
+  const localJobs = getStoredJobs();
+  if (localJobs.length === 0) return 0;
+
+  let count = 0;
+  for (const job of localJobs) {
+    try {
+      const jobRef = doc(db, 'users', userId, 'jobs', job.id);
+      await setDoc(jobRef, {
+        ...job,
+        userId,
+        syncedAt: new Date().toISOString(),
+      }, { merge: true });
+      count++;
+    } catch (e) {
+      console.error(`Failed to migrate job ${job.id} to cloud:`, e);
+    }
+  }
+  return count;
+}
+
+// Set up real-time listener for Firestore jobs
+export function setupRealtimeSync(
+  userId: string,
+  onUpdate: (cloudJobs: Job[]) => void
+): () => void {
+  const jobsCol = collection(db, 'users', userId, 'jobs');
+
+  const unsubscribe = onSnapshot(
+    jobsCol,
+    (snapshot) => {
+      if (snapshot.empty && getStoredJobs().length > 0) {
+        // First time cloud user with existing local jobs: seed cloud with local jobs
+        uploadLocalJobsToCloud(userId);
+        return;
+      }
+
+      const cloudJobs: Job[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Job;
+        cloudJobs.push(data);
+      });
+
+      // Sort by created_at descending
+      cloudJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      cachedJobs = cloudJobs;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudJobs));
+      onUpdate(cloudJobs);
+    },
+    (err) => {
+      console.error('Firestore real-time sync error:', err);
+    }
+  );
+
+  return unsubscribe;
 }
