@@ -30,7 +30,7 @@ import {
 } from '../services/storage';
 import { Job, JobStatus, PartItem, PartStatus } from '../types';
 import { PartsSupplierModal } from './PartsSupplierModal';
-import { AUTO_PARTS_STORES } from '../services/partsStores';
+import { AUTO_PARTS_STORES, formatPartSearchQuery } from '../services/partsStores';
 import { VoiceInputButton } from './VoiceInputButton';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
@@ -147,25 +147,32 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
 
   // MILESTONE 5: Smart Punch-Out Sourcing Link
   // Grabs active vehicle attributes (Year Make Model Engine) + specific part name,
+  // normalizes query using formatPartSearchQuery,
   // copies search query to clipboard with instant visual feedback,
   // and opens target sourcing catalog (RockAuto or Google Shopping).
   const handleFindPart = (partName: string, provider: 'google' | 'rockauto' = 'rockauto') => {
-    const searchPhrase = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.engine} ${partName}`.trim();
+    const { fullQuery } = formatPartSearchQuery(
+      vehicle.year,
+      vehicle.make,
+      vehicle.model,
+      vehicle.engine || '',
+      partName
+    );
 
     // Copy to system clipboard cleanly
-    navigator.clipboard.writeText(searchPhrase).then(() => {
-      setCopiedSearchPrompt(partName);
-      setTimeout(() => setCopiedSearchPrompt(null), 3000);
+    navigator.clipboard.writeText(fullQuery).then(() => {
+      setCopiedSearchPrompt(fullQuery);
+      setTimeout(() => setCopiedSearchPrompt(null), 3500);
     });
 
     // Open target catalog in new tab
     let targetUrl = '';
     if (provider === 'rockauto') {
       // RockAuto search / catalog redirect
-      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${searchPhrase}`)}`;
+      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`;
     } else {
       // Google Shopping direct punch-out
-      targetUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchPhrase)}`;
+      targetUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(fullQuery)}`;
     }
 
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -620,12 +627,23 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
                         </button>
 
                         <button
+                          id={`find-part-google-${part.id}`}
+                          onClick={() => handleFindPart(part.part_name, 'google')}
+                          className="min-h-[44px] px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 text-xs border border-slate-700 transition flex items-center gap-1"
+                          title="Compare prices across AutoZone, Advance, O'Reilly & RockAuto on Google Shopping"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold hidden sm:inline">Prices</span>
+                        </button>
+
+                        <button
                           id={`find-part-rockauto-${part.id}`}
                           onClick={() => handleFindPart(part.part_name, 'rockauto')}
-                          className="min-h-[44px] px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700 transition"
-                          title="Direct RockAuto search"
+                          className="min-h-[44px] px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 text-xs border border-slate-700 transition flex items-center gap-1"
+                          title="Direct RockAuto catalog search"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold hidden sm:inline">RockAuto</span>
                         </button>
                       </div>
 

@@ -14,6 +14,57 @@ export interface AutoPartsStore {
   notes?: string;
   createdAt?: string;
   buildSearchUrl: (year: string, make: string, model: string, engine: string, partName: string) => string;
+  buildDirectProductUrl?: (year: string, make: string, model: string, engine: string, partName: string) => string;
+}
+
+export function formatPartSearchQuery(
+  year: string,
+  make: string,
+  model: string,
+  engine: string,
+  partName: string
+): { cleanPart: string; fullQuery: string; vehicleQuery: string } {
+  let cleanPart = partName.trim();
+  const lower = cleanPart.toLowerCase();
+
+  // Normalize common mechanic shorthand into full industry part terms
+  if (
+    lower === 'temp sensor' ||
+    lower === 'coolant sensor' ||
+    lower === 'ect sensor' ||
+    lower === 'water temp sensor' ||
+    lower === 'engine temp sensor'
+  ) {
+    cleanPart = 'Engine Coolant Temperature Sensor';
+  } else if (lower.includes('o2 sensor') || lower === 'oxygen sensor') {
+    cleanPart = 'Oxygen Sensor (O2)';
+  } else if (lower === 'alt') {
+    cleanPart = 'Alternator';
+  } else if (lower === 'rad') {
+    cleanPart = 'Radiator';
+  } else if (lower === 'cat' || lower === 'catalytic') {
+    cleanPart = 'Catalytic Converter';
+  } else if (lower === 'tps') {
+    cleanPart = 'Throttle Position Sensor';
+  } else if (lower === 'maf' || lower === 'maf sensor') {
+    cleanPart = 'Mass Air Flow Sensor';
+  } else if (lower === 'map' || lower === 'map sensor') {
+    cleanPart = 'Manifold Absolute Pressure Sensor';
+  } else if (lower === 'cps' || lower === 'cam sensor') {
+    cleanPart = 'Camshaft Position Sensor';
+  } else if (lower === 'crank sensor' || lower === 'ckp') {
+    cleanPart = 'Crankshaft Position Sensor';
+  } else if (lower === 't-stat' || lower === 'thermostat') {
+    cleanPart = 'Engine Coolant Thermostat';
+  }
+
+  // Clean vehicle specs (remove complex engine parentheticals for external stores)
+  const simpleEngine = engine ? engine.split(/[\(/,]/)[0].trim() : '';
+  const vehicleParts = [year, make, model, simpleEngine].filter(Boolean);
+  const vehicleQuery = vehicleParts.join(' ').trim();
+  const fullQuery = `${vehicleQuery} ${cleanPart}`.replace(/\s+/g, ' ').trim();
+
+  return { cleanPart, fullQuery, vehicleQuery };
 }
 
 export const CUSTOM_STORES_STORAGE_KEY = 'autoshop_custom_parts_stores_v1';
@@ -209,8 +260,12 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     badgeColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
     accentColor: 'text-orange-400 hover:border-orange-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
-      const q = `${year} ${make} ${model} ${engine} ${partName}`.trim();
-      return `https://www.autozone.com/searchresult?searchText=${encodeURIComponent(q)}`;
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.autozone.com/searchresult?searchText=${encodeURIComponent(fullQuery)}`;
+    },
+    buildDirectProductUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:autozone.com ${fullQuery}`)}`;
     },
   },
   {
@@ -222,8 +277,12 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     accentColor: 'text-emerald-400 hover:border-emerald-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
-      const q = `${year} ${make} ${model} ${engine} ${partName}`.trim();
-      return `https://www.oreillyauto.com/search?q=${encodeURIComponent(q)}`;
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.oreillyauto.com/search?q=${encodeURIComponent(fullQuery)}`;
+    },
+    buildDirectProductUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:oreillyauto.com ${fullQuery}`)}`;
     },
   },
   {
@@ -235,8 +294,12 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     badgeColor: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
     accentColor: 'text-rose-400 hover:border-rose-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
-      const q = `${year} ${make} ${model} ${engine} ${partName}`.trim();
-      return `https://www.advanceautoparts.com/find/product?q=${encodeURIComponent(q)}`;
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`;
+    },
+    buildDirectProductUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com ${fullQuery}`)}`;
     },
   },
   {
@@ -248,36 +311,53 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     accentColor: 'text-blue-400 hover:border-blue-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
-      const q = `${year} ${make} ${model} ${engine} ${partName}`.trim();
-      return `https://www.napaonline.com/en/search?text=${encodeURIComponent(q)}`;
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.napaonline.com/en/search?text=${encodeURIComponent(fullQuery)}`;
+    },
+    buildDirectProductUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:napaonline.com ${fullQuery}`)}`;
     },
   },
 
   // --- WAREHOUSE & COMPARISON ---
   {
+    id: 'google_shopping',
+    name: 'Google Shopping (Multi-Store & Prices)',
+    shortName: 'Google Shopping',
+    tagline: 'Compares AutoZone, O\'Reilly, Advance, RockAuto & NAPA prices with direct product links',
+    category: 'Comparison',
+    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    accentColor: 'text-amber-400 hover:border-amber-500',
+    buildSearchUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(fullQuery)}`;
+    },
+  },
+  {
     id: 'rockauto',
-    name: 'RockAuto',
+    name: 'RockAuto Parts Catalog',
     shortName: 'RockAuto',
-    tagline: 'Discount OEM & aftermarket warehouse catalog',
+    tagline: 'Wholesale OEM & aftermarket warehouse catalog tree',
     category: 'Warehouse Catalog',
     badgeColor: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
     accentColor: 'text-sky-400 hover:border-sky-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
-      const q = `${year} ${make} ${model} ${engine} ${partName}`.trim();
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${q}`)}`;
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`;
     },
   },
   {
-    id: 'google_shopping',
-    name: 'Google Shopping / Local',
-    shortName: 'Google Shop',
-    tagline: 'Compare all local store prices & nearby availability',
-    category: 'Comparison',
-    badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    accentColor: 'text-amber-400 hover:border-amber-500',
+    id: 'amazon_auto',
+    name: 'Amazon Automotive Garage',
+    shortName: 'Amazon Auto',
+    tagline: 'Fitment verified OEM & aftermarket parts with fast Prime shipping',
+    category: 'Warehouse Catalog',
+    badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+    accentColor: 'text-yellow-400 hover:border-yellow-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
-      const q = `${year} ${make} ${model} ${engine} ${partName}`.trim();
-      return `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(q)}`;
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.amazon.com/s?k=${encodeURIComponent(fullQuery)}&i=automotive`;
     },
   },
 ];

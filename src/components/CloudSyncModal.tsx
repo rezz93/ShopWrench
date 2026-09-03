@@ -19,6 +19,7 @@ import {
   Check,
   Info,
   Server,
+  ExternalLink,
 } from 'lucide-react';
 import {
   loginWithGoogle,
@@ -440,12 +441,37 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
             </div>
           </div>
 
-          <div className="p-2.5 rounded-lg bg-slate-900/50 border border-slate-800/50 text-[11px] text-slate-400 leading-relaxed">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <a
+              href="https://console.firebase.google.com/project/project-28aa91bf-2468-45a9-912/firestore/databases/ai-studio-mechanicvinrepai-a681cd03-3101-4a99-8beb-a4967b75fe3d/data"
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center justify-between transition cursor-pointer"
+            >
+              <span>Open Firestore Database</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+
+            <a
+              href="https://console.firebase.google.com/project/project-28aa91bf-2468-45a9-912/authentication/providers"
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center justify-between transition cursor-pointer"
+            >
+              <span>Open Auth Sign-In Providers</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-slate-900/50 border border-slate-800/50 text-[11px] text-slate-400 leading-relaxed space-y-1.5">
             <p className="flex items-start gap-1.5">
               <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span>
-                <strong>Finding your project:</strong> In Google Firebase Console (<em>console.firebase.google.com</em>), look for <strong>project-28aa91bf-2468-45a9-912</strong> (Project #966351303642).
+                <strong>Where is it in Firebase Console?</strong> Your Firebase project is <strong>&quot;My First Project&quot;</strong> (ID: <code className="text-slate-300 font-mono">project-28aa91bf-2468-45a9-912</code>).
               </span>
+            </p>
+            <p className="text-slate-400 pl-5">
+              <code className="text-amber-400 font-mono text-[10px]">ai-studio-mechanicvinrepai-...</code> is the <strong>database inside</strong> this project. In the Firebase Console, go to <em>Firestore Database</em>, and select this database from the dropdown menu at the top of the page.
             </p>
           </div>
         </div>

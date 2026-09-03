@@ -162,6 +162,14 @@ async function syncJobToFirestore(job: Job): Promise<void> {
   const user = auth.currentUser;
   if (!user) return;
   try {
+    // Ensure parent user document exists with metadata
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      uid: user.uid,
+      email: user.email || '',
+      lastSync: new Date().toISOString(),
+    }, { merge: true });
+
     const jobRef = doc(db, 'users', user.uid, 'jobs', job.id);
     await setDoc(jobRef, {
       ...job,
@@ -327,6 +335,21 @@ export function cyclePartStatus(currentStatus: PartStatus): PartStatus {
 // Upload all local jobs to the user's cloud account when they sign in
 export async function uploadLocalJobsToCloud(userId: string): Promise<number> {
   const localJobs = getStoredJobs();
+  const user = auth.currentUser;
+
+  // Create or update parent user document
+  try {
+    const userRef = doc(db, 'users', userId);
+    await setDoc(userRef, {
+      uid: userId,
+      email: user?.email || '',
+      lastSync: new Date().toISOString(),
+      jobCount: localJobs.length,
+    }, { merge: true });
+  } catch (err) {
+    console.error('Failed to create parent user doc:', err);
+  }
+
   if (localJobs.length === 0) return 0;
 
   let count = 0;
