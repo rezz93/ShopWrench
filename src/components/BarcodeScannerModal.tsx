@@ -61,7 +61,7 @@ export function parseAndCleanVin(rawInput: string): string | null {
     }
   }
 
-  // 4. Strict 17-character regex match for valid VIN format (no I, O, Q)
+  // 4. Strict 17-character regex match for valid ISO 3779 VIN format (no I, O, Q)
   const upper = text.toUpperCase();
   const strictMatches = upper.match(/\b([A-HJ-NPR-Z0-9]{17})\b/g);
   if (strictMatches && strictMatches.length > 0) {
@@ -71,7 +71,7 @@ export function parseAndCleanVin(rawInput: string): string | null {
   // 5. Clean string of all non-alphanumeric chars
   const alphanumeric = upper.replace(/[^A-Z0-9]/g, '');
 
-  // Look for any 17-char subsegment without I, O, Q
+  // Look for any exact 17-char subsegment without I, O, Q
   for (let i = 0; i <= alphanumeric.length - 17; i++) {
     const candidate = alphanumeric.slice(i, i + 17);
     if (!/[IOQ]/.test(candidate)) {
@@ -88,24 +88,43 @@ export function parseAndCleanVin(rawInput: string): string | null {
     }
   }
 
-  // - Map OCR misreads: O -> 0, Q -> 0, I -> 1
-  const mapped = alphanumeric.replace(/O/g, '0').replace(/Q/g, '0').replace(/I/g, '1');
-  if (mapped.length >= 17) {
-    return mapped.slice(0, 17);
+  // 7. Normalize typical OCR stamped-metal confusions (O->0, Q->0, I->1, S->5 in num slots)
+  const normalized = alphanumeric
+    .replace(/O/g, '0')
+    .replace(/Q/g, '0')
+    .replace(/I/g, '1');
+
+  // Look for exact 17-char subsegments in normalized stream
+  for (let i = 0; i <= normalized.length - 17; i++) {
+    const cand = normalized.slice(i, i + 17);
+    if (!/[IOQ]/.test(cand)) {
+      return cand;
+    }
   }
 
-  // Fallback for partial VINs (at least 11 chars)
-  if (mapped.length >= 11) {
-    return mapped.slice(0, 17);
+  // Fallback: If 17 chars long after normalization
+  if (normalized.length === 17) {
+    return normalized;
+  }
+
+  // If longer than 17 chars and starts with known WMI pattern (1, 2, 3, 4, 5, J, K, W, S, M, etc.)
+  if (normalized.length > 17) {
+    for (let i = 0; i <= normalized.length - 17; i++) {
+      const segment = normalized.slice(i, i + 17);
+      // Valid first digit of VIN is country/region code: 1-5 (North America), J (Japan), K (Korea), W (Germany), etc.
+      if (/^[1-5JKWVSMNLTR6-9]/.test(segment) && !/[IOQ]/.test(segment)) {
+        return segment;
+      }
+    }
   }
 
   return null;
 }
 
 /**
- * Preprocess image on HTML5 Canvas to fight windshield glare and sunlight reflection
+ * Preprocess image on HTML5 Canvas to fight windshield glare, stamped metal artifacts, and sunlight reflection
  */
-function preprocessCanvasImage(canvas: HTMLCanvasElement, mode: 'contrast' | 'binarize' | 'normal'): string {
+function preprocessCanvasImage(canvas: HTMLCanvasElement, mode: 'contrast' | 'binarize' | 'normal' | 'crop_center'): string {
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas.toDataURL('image/jpeg', 0.9);
 
@@ -121,17 +140,17 @@ function preprocessCanvasImage(canvas: HTMLCanvasElement, mode: 'contrast' | 'bi
     // Luminance formula
     const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
 
-    if (mode === 'contrast') {
+    if (mode === 'contrast' || mode === 'crop_center') {
       // High contrast stretch (increases contrast between stamped metal text and glass glare)
-      const contrastFactor = 1.6;
+      const contrastFactor = 1.8;
       let enhanced = (gray - 128) * contrastFactor + 128;
       enhanced = Math.max(0, Math.min(255, enhanced));
       data[i] = enhanced;
       data[i + 1] = enhanced;
       data[i + 2] = enhanced;
     } else if (mode === 'binarize') {
-      // Binarization threshold to eliminate soft sun reflections
-      const threshold = 135;
+      // Adaptive binarization threshold to eliminate soft sun reflections
+      const threshold = 130;
       const val = gray > threshold ? 255 : 0;
       data[i] = val;
       data[i + 1] = val;
@@ -441,36 +460,66 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         img.src = base64Data;
       });
 
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
+      // Pass 1: Center-cropped reticle area (where the user aligns the metal plate)
+      // Crop to the middle 80% width and 35% height to eliminate windshield stickers, wiper blades, and glare outside the plate
+      const cropCanvas = document.createElement('canvas');
+      const cropW = Math.floor(img.width * 0.85);
+      const cropH = Math.floor(img.height * 0.40);
+      const cropX = Math.floor((img.width - cropW) / 2);
+      const cropY = Math.floor((img.height - cropH) / 2);
+
+      cropCanvas.width = cropW;
+      cropCanvas.height = cropH;
+      const cropCtx = cropCanvas.getContext('2d');
+      if (cropCtx) {
+        cropCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        const enhancedCropUrl = preprocessCanvasImage(cropCanvas, 'contrast');
+        const cropResult = await recognize(enhancedCropUrl, 'eng');
+        const cropExtracted = parseAndCleanVin(cropResult?.data?.text || '');
+        if (cropExtracted && cropExtracted.length >= 11) {
+          handleVinIdentified(cropExtracted, 'Decoded from Windshield Plate OCR (Center Focus)');
+          return;
+        }
+      }
+
+      // Pass 2: Full frame with current glare filter
+      const fullCanvas = document.createElement('canvas');
+      fullCanvas.width = img.width;
+      fullCanvas.height = img.height;
+      const ctx = fullCanvas.getContext('2d');
       if (!ctx) throw new Error('Canvas context failure');
       ctx.drawImage(img, 0, 0);
 
-      // Pass 1: Contrast-enhanced image (removes diffuse sun glare)
-      const enhancedDataUrl = preprocessCanvasImage(canvas, glareFilter);
-
-      // Perform OCR
+      const enhancedDataUrl = preprocessCanvasImage(fullCanvas, glareFilter);
       const result = await recognize(enhancedDataUrl, 'eng');
-
       const rawText = result?.data?.text || '';
       const extracted = parseAndCleanVin(rawText);
 
       if (extracted && extracted.length >= 11) {
         handleVinIdentified(extracted, 'Decoded from Windshield Plate OCR');
-      } else {
-        // Try fallback pass with raw image
-        const rawResult = await recognize(base64Data, 'eng');
-        const fallbackExtracted = parseAndCleanVin(rawResult?.data?.text || '');
-        if (fallbackExtracted && fallbackExtracted.length >= 11) {
-          handleVinIdentified(fallbackExtracted, 'Decoded from Windshield Plate OCR');
-        } else {
-          throw new Error(
-            'Could not clearly read 17 digits from the photo. Sun glare or angle may have blurred the metal plate. Please try capturing with "Sun Glare Filter" ON, hold camera closer, or type the digits below.'
-          );
-        }
+        return;
       }
+
+      // Pass 3: High contrast binarization pass
+      const binarizedUrl = preprocessCanvasImage(fullCanvas, 'binarize');
+      const binarizedResult = await recognize(binarizedUrl, 'eng');
+      const binExtracted = parseAndCleanVin(binarizedResult?.data?.text || '');
+      if (binExtracted && binExtracted.length >= 11) {
+        handleVinIdentified(binExtracted, 'Decoded from Windshield Plate OCR (High Contrast)');
+        return;
+      }
+
+      // Pass 4: Fallback pass with raw image
+      const rawResult = await recognize(base64Data, 'eng');
+      const fallbackExtracted = parseAndCleanVin(rawResult?.data?.text || '');
+      if (fallbackExtracted && fallbackExtracted.length >= 11) {
+        handleVinIdentified(fallbackExtracted, 'Decoded from Windshield Plate OCR');
+        return;
+      }
+
+      throw new Error(
+        'Could not clearly read 17 digits from the windshield metal plate. Sun glare or glass reflection obscured the stamped digits. Tap "Door QR / Barcode" for instant scan, or type/speak the digits.'
+      );
     } catch (err: unknown) {
       console.error('OCR processing error:', err);
       setErrorMsg(err instanceof Error ? err.message : 'Failed to extract VIN from image.');

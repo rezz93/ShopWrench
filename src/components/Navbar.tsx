@@ -1,7 +1,8 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { Wrench, Car, Plus, Cloud, Activity } from 'lucide-react';
+import { Wrench, Car, Plus, Cloud, Activity, Info } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
+import { APP_VERSION } from '../version';
 
 interface NavbarProps {
   activeTab: 'ledger' | 'intake' | 'workspace' | 'obd';
@@ -34,6 +35,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-black text-lg text-white tracking-tight">ShopWrench</span>
               <span className="text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
                 PRO
+              </span>
+              <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+                v{APP_VERSION}
               </span>
             </div>
             <span className="text-[11px] text-slate-400 block font-medium">Auto Tech Job &amp; VIN Tracker</span>

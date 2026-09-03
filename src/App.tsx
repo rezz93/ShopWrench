@@ -16,6 +16,7 @@ import {
 } from './services/storage';
 import { auth, onAuthStateChanged } from './services/firebase';
 import { Job } from './types';
+import { APP_VERSION } from './version';
 import { Wrench, RotateCcw, Database, Cloud } from 'lucide-react';
 
 export default function App() {
@@ -185,6 +186,9 @@ export default function App() {
         <div className="flex items-center gap-2">
           <Wrench className="w-4 h-4 text-amber-500" />
           <span>ShopWrench Tactile Tech Console</span>
+          <span className="font-mono text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-slate-400">
+            v{APP_VERSION}
+          </span>
         </div>
 
         <div className="flex items-center gap-4">

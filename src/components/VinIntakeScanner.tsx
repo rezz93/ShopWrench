@@ -18,6 +18,8 @@ import { createNewJob } from '../services/storage';
 import { DecodeVinResponse, Job } from '../types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { VoiceInputButton } from './VoiceInputButton';
+import { VoiceVinModal } from './VoiceVinModal';
+import { parseSpokenVin } from '../utils/natoPhonetic';
 
 interface VinIntakeScannerProps {
   onJobCreated: (newJob: Job) => void;
@@ -36,6 +38,7 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
   const [decodedData, setDecodedData] = useState<DecodeVinResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
   const cleanVin = vinInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -175,21 +178,16 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
               </span>
             </label>
             <div className="flex items-center gap-3">
-              <VoiceInputButton
+              <button
+                type="button"
                 id="voice-dictate-vin-btn"
-                size="sm"
-                mode="replace"
-                onTranscript={(text) => {
-                  const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                  setVinInput(cleaned);
-                  if (cleaned.length === 17) {
-                    handleDecode(cleaned);
-                  }
-                }}
-                title="Speak VIN (letters and numbers)"
-                showLabel={true}
-                label="Speak VIN"
-              />
+                onClick={() => setIsVoiceModalOpen(true)}
+                className="min-h-[36px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                title="Speak VIN (letters, numbers, or NATO phonetic words)"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Speak VIN</span>
+              </button>
               {cleanVin.length > 0 && (
                 <span className={`text-xs font-mono font-medium ${cleanVin.length === 17 ? 'text-emerald-400' : 'text-slate-400'}`}>
                   {cleanVin.length}/17
@@ -477,6 +475,20 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScanSuccess={handleBarcodeScanned}
+      />
+
+      {/* Voice VIN Dictation Modal */}
+      <VoiceVinModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        initialVin={vinInput}
+        onVinConfirmed={(spokenVin) => {
+          setVinInput(spokenVin);
+          setIsVoiceModalOpen(false);
+          if (spokenVin.length === 17) {
+            handleDecode(spokenVin);
+          }
+        }}
       />
     </div>
   );

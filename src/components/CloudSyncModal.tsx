@@ -15,6 +15,10 @@ import {
   Lock,
   UserPlus,
   LogIn,
+  Copy,
+  Check,
+  Info,
+  Server,
 } from 'lucide-react';
 import {
   loginWithGoogle,
@@ -23,6 +27,7 @@ import {
   logoutUser,
 } from '../services/firebase';
 import { uploadLocalJobsToCloud } from '../services/storage';
+import { APP_VERSION_INFO } from '../version';
 
 interface CloudSyncModalProps {
   isOpen: boolean;
@@ -45,6 +50,13 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
   if (!isOpen) return null;
 
@@ -62,7 +74,13 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
       const error = err as { code?: string; message?: string };
       console.error('Sign-in error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg(error.message || 'Failed to sign in. Please try again.');
+        if (error.code === 'auth/unauthorized-domain') {
+          setErrorMsg('Firebase Error (auth/unauthorized-domain): This app domain is not yet whitelisted in your Firebase Console. In Firebase Console > Authentication > Settings > Authorized Domains, add the current app hostname (e.g. *.run.app).');
+        } else if (error.code === 'auth/operation-not-allowed') {
+          setErrorMsg('Firebase Error (auth/operation-not-allowed): Google Sign-In is not enabled. In Firebase Console > Authentication > Sign-in method, click "Google" and enable it.');
+        } else {
+          setErrorMsg(error.message || 'Failed to sign in. Please try again.');
+        }
       }
     } finally {
       setIsLoading(false);
@@ -98,7 +116,9 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     } catch (err: unknown) {
       const error = err as { code?: string; message?: string };
       console.error('Email auth error:', error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/operation-not-allowed') {
+        setErrorMsg('Firebase Error (auth/operation-not-allowed): Email/Password login is not enabled. In Firebase Console > Authentication > Sign-in method, enable "Email/Password".');
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         setErrorMsg('Invalid email or password.');
       } else if (error.code === 'auth/email-already-in-use') {
         setErrorMsg('Account with this email already exists. Click "Log In" instead.');
@@ -373,6 +393,62 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
             </form>
           </div>
         )}
+
+        {/* Firebase Project Info & App Version Tracking */}
+        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-slate-300">
+                Firebase Project &amp; Version
+              </span>
+            </div>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              v{APP_VERSION_INFO.version}
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Firebase Project ID</span>
+                <span className="font-mono text-slate-200 font-semibold text-[11px]">project-28aa91bf-2468-45a9-912</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => copyToClipboard('project-28aa91bf-2468-45a9-912', 'proj')}
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+              >
+                {copiedKey === 'proj' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedKey === 'proj' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">App Domain (for Auth Whitelist)</span>
+                <span className="font-mono text-slate-200 font-semibold text-[11px]">ais-dev-tfper6psn5hqifvuhyslqd-116799203877.us-east1.run.app</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => copyToClipboard('ais-dev-tfper6psn5hqifvuhyslqd-116799203877.us-east1.run.app', 'domain')}
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+              >
+                {copiedKey === 'domain' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedKey === 'domain' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-slate-900/50 border border-slate-800/50 text-[11px] text-slate-400 leading-relaxed">
+            <p className="flex items-start gap-1.5">
+              <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>Finding your project:</strong> In Google Firebase Console (<em>console.firebase.google.com</em>), look for <strong>project-28aa91bf-2468-45a9-912</strong> (Project #966351303642).
+              </span>
+            </p>
+          </div>
+        </div>
 
         <div className="pt-1 text-center">
           <button
