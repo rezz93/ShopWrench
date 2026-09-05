@@ -215,7 +215,6 @@ const WORD_TO_CHAR_MAP: Record<string, string> = {
 
   // Letter W
   'W': 'W',
-  'DOUBLE': 'W',
   'DOUBLEU': 'W',
   'DOUBLE-U': 'W',
   'WHISKEY': 'W',
@@ -292,20 +291,71 @@ export function parseSpokenVin(transcript: string): string {
       continue;
     }
 
-    // 2. Direct phonetic / spoken word match
-    if (WORD_TO_CHAR_MAP[word]) {
-      result += WORD_TO_CHAR_MAP[word];
-      continue;
-    }
-
-    // 3. Multi-word phrases like "DOUBLE U" -> W
+    // 2. Multi-word phrases: "DOUBLE U" or "DOUBLE YOU" -> W
     if (word === 'DOUBLE' && i + 1 < rawWords.length && (rawWords[i + 1] === 'U' || rawWords[i + 1] === 'YOU')) {
       result += 'W';
       i++; // Skip next token
       continue;
     }
 
-    // 4. Token already consists of valid alphanumeric chars (e.g. "1GTH6", "41BT", "B", "7")
+    // 3. Multipliers: "DOUBLE <char>" -> char twice, "TRIPLE <char>" -> char 3 times
+    if ((word === 'DOUBLE' || word === 'TRIPLE') && i + 1 < rawWords.length) {
+      const nextWord = rawWords[i + 1];
+      const count = word === 'DOUBLE' ? 2 : 3;
+      let targetChar = '';
+
+      if (WORD_TO_CHAR_MAP[nextWord]) {
+        targetChar = WORD_TO_CHAR_MAP[nextWord];
+      } else {
+        const clean = nextWord.replace(/[^A-Z0-9]/g, '');
+        if (clean.length === 1) {
+          targetChar = clean;
+        }
+      }
+
+      if (targetChar) {
+        result += targetChar.repeat(count);
+        i++; // Skip target token
+        continue;
+      }
+    }
+
+    // 4. Compound tens numbers: "TWENTY ONE" -> 21, "FORTY FIVE" -> 45, etc.
+    const TENS_MAP: Record<string, string> = {
+      'TWENTY': '2',
+      'THIRTY': '3',
+      'FORTY': '4',
+      'FIFTY': '5',
+      'SIXTY': '6',
+      'SEVENTY': '7',
+      'EIGHTY': '8',
+      'NINETY': '9',
+    };
+    const UNITS_MAP: Record<string, string> = {
+      'ONE': '1', '1': '1',
+      'TWO': '2', '2': '2',
+      'THREE': '3', '3': '3',
+      'FOUR': '4', '4': '4',
+      'FIVE': '5', '5': '5',
+      'SIX': '6', '6': '6',
+      'SEVEN': '7', '7': '7',
+      'EIGHT': '8', '8': '8',
+      'NINE': '9', '9': '9',
+    };
+
+    if (TENS_MAP[word] && i + 1 < rawWords.length && UNITS_MAP[rawWords[i + 1]]) {
+      result += `${TENS_MAP[word]}${UNITS_MAP[rawWords[i + 1]]}`;
+      i++; // Skip units token
+      continue;
+    }
+
+    // 5. Direct phonetic / spoken word match
+    if (WORD_TO_CHAR_MAP[word]) {
+      result += WORD_TO_CHAR_MAP[word];
+      continue;
+    }
+
+    // 6. Token already consists of valid alphanumeric chars (e.g. "1GTH6", "41BT", "B", "7")
     // If it's a short sequence or contains digits, treat each character directly.
     const cleanChars = word.replace(/[^A-Z0-9]/g, '');
     if (cleanChars.length > 0) {
@@ -328,6 +378,41 @@ export function parseSpokenVin(transcript: string): string {
     .replace(/[^A-HJ-NPR-Z0-9]/g, '');
 
   return sanitized.slice(0, 17);
+}
+
+/**
+ * High-level parser that seamlessly handles BOTH phone keyboard dictation
+ * (spoken words with spaces like "1 F T F W 1 E D 4 M F A 1 2 3 4 5" or "one golf tango hotel...")
+ * AND standard alphanumeric typing/pasting (like "1FTFW1ED4MFA12345").
+ */
+export function formatAndParseVin(rawText: string): { vin: string; isConvertedFromSpeech: boolean } {
+  if (!rawText) return { vin: '', isConvertedFromSpeech: false };
+
+  const trimmed = rawText.trim();
+
+  // If text contains spaces, dashes, or non-alphanumeric separators, it is likely spoken dictation from phone keyboard
+  const hasSpacedSeparators = /[\s\-_.,/]+/.test(trimmed);
+
+  // Check if string contains known spoken words like "one", "two", "zero", "bravo", "hotel", etc.
+  const upper = trimmed.toUpperCase();
+  const containsCommonSpokenWords = /\b(ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|ZERO|OH|ALPHA|BRAVO|CHARLIE|DELTA|ECHO|FOXTROT|GOLF|HOTEL|JULIET|KILO|LIMA|MIKE|NOVEMBER|OSCAR|PAPA|QUEBEC|ROMEO|SIERRA|TANGO|UNIFORM|VICTOR|WHISKEY|XRAY|YANKEE|ZULU|DOUBLE|TRIPLE)\b/.test(upper);
+
+  if (hasSpacedSeparators || containsCommonSpokenWords) {
+    const parsed = parseSpokenVin(trimmed);
+    if (parsed.length > 0) {
+      return { vin: parsed, isConvertedFromSpeech: true };
+    }
+  }
+
+  // Otherwise, standard alphanumeric string: sanitize I, O, Q to 1, 0, 0 and clean non-alphanumerics
+  const cleanStandard = upper
+    .replace(/I/g, '1')
+    .replace(/O/g, '0')
+    .replace(/Q/g, '0')
+    .replace(/[^A-HJ-NPR-Z0-9]/g, '')
+    .slice(0, 17);
+
+  return { vin: cleanStandard, isConvertedFromSpeech: false };
 }
 
 /**

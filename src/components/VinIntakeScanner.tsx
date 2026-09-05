@@ -24,7 +24,7 @@ import { DecodeVinResponse, Job } from '../types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { VoiceInputButton } from './VoiceInputButton';
 import { VoiceVinModal } from './VoiceVinModal';
-import { parseSpokenVin } from '../utils/natoPhonetic';
+import { parseSpokenVin, formatAndParseVin } from '../utils/natoPhonetic';
 
 interface VinIntakeScannerProps {
   onJobCreated: (newJob: Job) => void;
@@ -82,6 +82,7 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
   const [manualDrivetrain, setManualDrivetrain] = useState('4WD / 4x4');
   const [manualFuel, setManualFuel] = useState('Gasoline');
   const [manualOptionalVin, setManualOptionalVin] = useState('');
+  const [keyboardSpeechNotice, setKeyboardSpeechNotice] = useState(false);
 
   const cleanVin = vinInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -333,9 +334,14 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                 <button
                   type="button"
                   id="voice-dictate-vin-btn"
-                  onClick={() => setIsVoiceModalOpen(true)}
-                  className="min-h-[36px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                  title="Speak VIN (letters, numbers, or NATO phonetic words)"
+                  onClick={() => {
+                    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    setIsVoiceModalOpen(true);
+                  }}
+                  className="min-h-[36px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                  title="Speak VIN (App Mic, Gemini AI, or Phone Keyboard)"
                 >
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
                   <span>Speak VIN</span>
@@ -354,11 +360,17 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                 <input
                   id="vin-input-field"
                   type="text"
-                  maxLength={17}
-                  placeholder="e.g. 1FTFW1ED4MFA12345"
+                  maxLength={80}
+                  placeholder="e.g. 1FTFW1ED4MFA12345 or speak letters..."
                   value={vinInput}
                   onChange={(e) => {
-                    setVinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                    const raw = e.target.value;
+                    const { vin, isConvertedFromSpeech } = formatAndParseVin(raw);
+                    setVinInput(vin);
+                    if (isConvertedFromSpeech) {
+                      setKeyboardSpeechNotice(true);
+                      setTimeout(() => setKeyboardSpeechNotice(false), 5000);
+                    }
                     if (errorMsg) setErrorMsg(null);
                   }}
                   onKeyDown={(e) => {
@@ -374,7 +386,10 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                   {vinInput && (
                     <button
                       type="button"
-                      onClick={() => setVinInput('')}
+                      onClick={() => {
+                        setVinInput('');
+                        setKeyboardSpeechNotice(false);
+                      }}
                       aria-label="Clear VIN"
                       className="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2 py-1 rounded cursor-pointer transition"
                     >
@@ -387,9 +402,9 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                     mode="replace"
                     voiceMode="vin"
                     onTranscript={(text) => {
-                      const clean = parseSpokenVin(text) || text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
-                      if (clean) {
-                        setVinInput(clean);
+                      const { vin } = formatAndParseVin(text);
+                      if (vin) {
+                        setVinInput(vin);
                         if (errorMsg) setErrorMsg(null);
                       }
                     }}
@@ -434,7 +449,12 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                 <button
                   id="open-voice-vin-btn"
                   type="button"
-                  onClick={() => setIsVoiceModalOpen(true)}
+                  onClick={() => {
+                    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    setIsVoiceModalOpen(true);
+                  }}
                   className="flex-1 sm:flex-initial min-h-[54px] px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-bold text-base border-2 border-slate-600 hover:border-amber-400/60 flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
                   title="Dictate VIN with voice or spell with NATO phonetics"
                 >
@@ -442,6 +462,21 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                   <span className="whitespace-nowrap">Voice VIN</span>
                 </button>
               </div>
+            </div>
+
+            {/* Keyboard Speech Converted Notice */}
+            {keyboardSpeechNotice && (
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800/80 px-3.5 py-2 rounded-xl animate-in fade-in duration-150">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Converted spoken words/spaces from your phone keyboard into a clean VIN! ({cleanVin.length}/17)</span>
+              </div>
+            )}
+
+            {/* Phone Dictation Guidance */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 pt-0.5">
+              <span>
+                💡 <strong>Phone Tip:</strong> Tap the box &amp; press 🎙️ on your <strong>phone keyboard</strong> to dictate, or tap <strong>Speak VIN</strong> for the hands-free app mic.
+              </span>
             </div>
 
             {/* Helper: Switch to Manual Entry if No VIN */}
@@ -1007,8 +1042,8 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                     mode="replace"
                     voiceMode="vin"
                     onTranscript={(text) => {
-                      const clean = parseSpokenVin(text) || text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                      setManualOptionalVin(clean);
+                      const { vin } = formatAndParseVin(text);
+                      setManualOptionalVin(vin);
                     }}
                     title="Speak Optional VIN"
                   />
@@ -1016,9 +1051,13 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                 <input
                   id="manual-opt-vin-input"
                   type="text"
-                  placeholder="Leave empty, or enter partial/classic VIN if known..."
+                  maxLength={80}
+                  placeholder="Leave empty, or speak/enter partial or classic VIN..."
                   value={manualOptionalVin}
-                  onChange={(e) => setManualOptionalVin(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                  onChange={(e) => {
+                    const { vin } = formatAndParseVin(e.target.value);
+                    setManualOptionalVin(vin);
+                  }}
                   className="w-full min-h-[44px] px-4 text-xs font-mono text-white bg-slate-900 border border-slate-700/80 rounded-lg focus:border-amber-400 focus:outline-none placeholder:text-slate-600"
                 />
               </div>

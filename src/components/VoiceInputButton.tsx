@@ -55,6 +55,13 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      try {
+        document.activeElement.blur();
+      } catch {
+        // ignore
+      }
+    }
     if (!isSupported) {
       setToastError('Microphone not supported or blocked in this browser.');
       setTimeout(() => setToastError(null), 5000);

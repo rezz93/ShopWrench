@@ -7,10 +7,16 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.14',
+  version: '1.4.15',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v9',
+  build: 'rev-2026.09.05-v10',
   changes: [
+    'Resolved Android Chrome & phone audio-focus collision with Spotify: removed aggressive onend speech recognition restart loop that previously caused music to oscillate and cut out',
+    'Separated App Microphone from Phone Keyboard Microphone with 3 clear modes: App Live Mic (hands-free), Gemini AI Audio (shop & Spotify music-proof), and Phone Keyboard Mic',
+    'Fixed phone keyboard voice dictation: enhanced formatAndParseVin to seamlessly parse spaced words, NATO phonetics, and double/triple multipliers from Gboard/iOS keyboard dictation into clean 17-digit VINs without character truncation',
+    'Fixed critical phonetic parsing bug where "DOUBLE ZERO" was erroneously converting to "W0" by implementing smart multipliers for double/triple digits and compound tens numbers',
+    'Added automatic soft-keyboard dismissal when activating hands-free voice recognition to prevent dual-microphone conflicts between keyboard and browser',
+    'Added live status feedback badge confirming instant conversion from phone keyboard speech into clean VIN format',
     'Added Manual Vehicle Entry mode to start new jobs with Year, Make, Model, Style & Engine without requiring a 17-digit VIN',
     'Provided tactile quick-chips for common model years (2000-2025), popular shop makes (Ford, Chevy, Toyota, Honda, GMC, Ram, etc.), body styles (Crew Cab, Extended Cab, Sedan, SUV, etc.), and engine displacements',
     'Integrated voice dictation for all manual vehicle input fields (Make, Model, Style, Engine, Customer Name, Symptoms, Parts)',

@@ -230,9 +230,19 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
   }, [stopMediaStream]);
 
-  // Live SpeechRecognition with mathematical zero-duplication
+  // Live SpeechRecognition with mathematical zero-duplication & mobile Spotify audio-focus protection
   const startListening = useCallback(async () => {
     if (isListeningRef.current) return;
+
+    // 1. Immediately dismiss any open virtual keyboard on phone to prevent keyboard mic conflict
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      try {
+        document.activeElement.blur();
+      } catch {
+        // ignore
+      }
+    }
+
     setErrorMessage(null);
     setTranscript('');
     confirmedVinRef.current = '';
@@ -240,6 +250,11 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     completedGeneralHistoryRef.current = '';
     latestGeneralBurstRef.current = '';
     audioChunksRef.current = [];
+
+    const isMobileDevice = typeof navigator !== 'undefined' && (
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+      ('ontouchstart' in window && window.innerWidth < 1024)
+    );
 
     const win = typeof window !== 'undefined' ? (window as unknown as IWindow) : null;
     const SpeechRecognitionAPI = win?.SpeechRecognition || win?.webkitSpeechRecognition;
@@ -256,7 +271,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         }
 
         const recognition = new SpeechRecognitionAPI();
-        recognition.continuous = continuous;
+        // On mobile, continuous: true is unsupported and causes Android to pause/unpause Spotify endlessly
+        recognition.continuous = !isMobileDevice && continuous;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
         recognition.lang = lang;
@@ -335,6 +351,11 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
           console.warn('SpeechRecognition status:', event.error);
           if (event.error === 'no-speech') {
+            // On mobile, silence means listening finished naturally; close cleanly
+            if (isMobileDevice) {
+              isListeningRef.current = false;
+              setIsListening(false);
+            }
             return;
           }
           if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
@@ -346,28 +367,37 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         };
 
         recognition.onend = () => {
-          if (isListeningRef.current) {
-            // Commit latest burst into confirmed history
-            if (mode === 'vin') {
-              if (latestBurstVinRef.current) {
-                confirmedVinRef.current = mergeVinSequences(
-                  confirmedVinRef.current,
-                  latestBurstVinRef.current
-                );
-                latestBurstVinRef.current = '';
-              }
-            } else {
-              if (latestGeneralBurstRef.current) {
-                const prev = completedGeneralHistoryRef.current.trim();
-                const curr = latestGeneralBurstRef.current.trim();
-                if (!prev.toLowerCase().includes(curr.toLowerCase())) {
-                  completedGeneralHistoryRef.current = prev ? `${prev} ${curr}` : curr;
-                }
-                latestGeneralBurstRef.current = '';
-              }
+          // Commit latest burst into confirmed history
+          if (mode === 'vin') {
+            if (latestBurstVinRef.current) {
+              confirmedVinRef.current = mergeVinSequences(
+                confirmedVinRef.current,
+                latestBurstVinRef.current
+              );
+              latestBurstVinRef.current = '';
             }
+          } else {
+            if (latestGeneralBurstRef.current) {
+              const prev = completedGeneralHistoryRef.current.trim();
+              const curr = latestGeneralBurstRef.current.trim();
+              if (!prev.toLowerCase().includes(curr.toLowerCase())) {
+                completedGeneralHistoryRef.current = prev ? `${prev} ${curr}` : curr;
+              }
+              latestGeneralBurstRef.current = '';
+            }
+          }
 
-            // Keep listening if user hasn't tapped stop
+          // Mobile protection: On Android & iOS, do NOT auto-restart recognition inside onend!
+          // Auto-restarting on mobile Chrome grabs and drops audio focus every 2 seconds,
+          // which causes Spotify / background music to repeatedly cut out and back in.
+          if (isMobileDevice) {
+            isListeningRef.current = false;
+            setIsListening(false);
+            return;
+          }
+
+          // On desktop, keep listening if user hasn't explicitly stopped
+          if (isListeningRef.current) {
             try {
               recognition.start();
             } catch {
