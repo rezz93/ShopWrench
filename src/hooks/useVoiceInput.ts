@@ -107,7 +107,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       const base64Data = await blobToBase64(audioBlob);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const res = await fetch('/api/transcribe-audio', {
         method: 'POST',
@@ -141,11 +141,21 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
           throw new Error(data.error || 'Server could not transcribe audio.');
         }
       } else {
-        throw new Error(`HTTP Error ${res.status}`);
+        let detail = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error) detail = body.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(detail);
       }
     } catch (err: any) {
       console.warn('AI audio transcription error:', err);
-      const msg = 'Could not transcribe audio. Please try speaking again or use live typing.';
+      const detail = err?.name === 'AbortError'
+        ? 'Server took too long to respond.'
+        : (err instanceof Error && err.message) || '';
+      const msg = `Could not transcribe audio${detail ? ` (${detail})` : ''}. Please try speaking again or use live typing.`;
       setErrorMessage(msg);
       if (onErrorRef.current) onErrorRef.current(msg);
     } finally {
@@ -416,13 +426,24 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
           // or the idle timer fires. Android ends a session at every short pause, so this
           // is what lets a full 17-character VIN be dictated in one go.
           if (isListeningRef.current && recognitionRef.current === recognition) {
-            try {
-              recognition.start();
-            } catch {
-              clearIdleTimer();
-              setIsListening(false);
-              isListeningRef.current = false;
-            }
+            // Chrome can reject start() if called before the previous session has fully
+            // torn down; retry a few times with a short delay before giving up.
+            const restart = (attempt: number) => {
+              if (!isListeningRef.current || recognitionRef.current !== recognition) return;
+              try {
+                recognition.start();
+              } catch (err) {
+                if (attempt < 4) {
+                  setTimeout(() => restart(attempt + 1), 250);
+                } else {
+                  console.warn('SpeechRecognition restart failed:', err);
+                  clearIdleTimer();
+                  setIsListening(false);
+                  isListeningRef.current = false;
+                }
+              }
+            };
+            restart(0);
           } else {
             clearIdleTimer();
             setIsListening(false);
