@@ -7,10 +7,12 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.11',
+  version: '1.4.12',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v6',
+  build: 'rev-2026.09.05-v7',
   changes: [
+    'Removed all email authentication requirements and legacy email methods; app operates on 100% zero-login instant Firestore synchronization',
+    'Updated documentation to clarify zero-login device linking via direct URL',
     'Fixed Android Chrome speech repetition bug with mathematical mergeVinSequences suffix/prefix overlap deduplication',
     'Solved PC and Preview pane VIN speech misinterpretation by adding comprehensive phonetic letter homophones ("bee", "tee", "aitch", "gee"), number words, and compound tokens to WORD_TO_CHAR_MAP',
     'Added Gemini AI Multimodal Audio Scanner tab to Voice VIN modal for 100% accurate audio decoding in loud shop environments',

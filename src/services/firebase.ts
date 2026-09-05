@@ -7,8 +7,6 @@ import {
   signOut,
   onAuthStateChanged,
   signInAnonymously,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
   User,
 } from 'firebase/auth';
 import {
@@ -58,16 +56,6 @@ export async function loginWithGoogle(): Promise<User> {
 
 export async function loginAnonymously(): Promise<User> {
   const result = await signInAnonymously(auth);
-  return result.user;
-}
-
-export async function loginWithEmail(email: string, pass: string): Promise<User> {
-  const result = await signInWithEmailAndPassword(auth, email.trim(), pass);
-  return result.user;
-}
-
-export async function registerWithEmail(email: string, pass: string): Promise<User> {
-  const result = await createUserWithEmailAndPassword(auth, email.trim(), pass);
   return result.user;
 }
 

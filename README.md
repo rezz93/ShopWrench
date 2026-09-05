@@ -56,27 +56,18 @@ ShopWrench works on any computer with an internet browser (Google Chrome, Micros
 ShopWrench automatically saves your jobs locally so you never lose data. When you log in, all your vehicles, parts lists, and notes **sync across your phone and PC in real time**. A job you start at the car on your phone is immediately visible on your shop office computer.
 
 ### Step 1: Open the Sync Menu
-In the top-right corner of the screen, click or tap the button with the cloud icon:
-- If you're not logged in, it will say **"Sync Phone & PC"** in yellow/amber.
-- If you are already logged in, it will say **"Cloud Synced"** with a green pulsing dot.
+In the top-right corner of the screen, click or tap the button with the cloud icon (**"Cloud Live"**).
 
-### Step 2: Choose How to Sign In
-You have two easy choices:
-1. **Google Sign-In (Recommended)**:
-   - Click or tap **"Sign In with Google"**.
-   - Select your Google / Gmail account from the popup.
-   - You're instantly logged in!
-2. **Email & Password**:
-   - Click the **Email** option.
-   - Enter your email address and choose a password (minimum 6 characters).
-   - If this is your first time, click **"Need an account? Sign Up"**. If you already made one, click **"Log In"**.
+### Step 2: Zero-Login Direct Connection
+ShopWrench requires **no account creation, no login, and no email**:
+- All shop repair jobs automatically synchronize between your phone in the bay and your desk PC in real-time via Google Cloud Firestore.
+- No passwords to remember or credentials to manage while wearing shop gloves.
 
 ### Step 3: Connect Your Second Device
-1. Open ShopWrench on your other device (for example, your office laptop).
-2. Tap the **"Sync Phone & PC"** button in the top header.
-3. Sign into the **exact same account** you used on your phone.
-4. **Done!** Any job, part status update, or note made on one device will show up on the other device within seconds.
-5. **Works Offline Too**: If Wi-Fi drops out while you're under the hood, your work is saved locally on your device and will automatically sync to the cloud as soon as connection is restored.
+1. Open ShopWrench on your other device (for example, your phone or office laptop) using the exact same URL: `https://shopwrench.ai.studio/`.
+2. Tap the **"Cloud Live"** button in the header anytime to view connection status or copy your direct URL.
+3. **Done!** Any job created, parts status updated, or note taken on your phone appears on your PC instantly.
+4. **Works Offline Too**: If Wi-Fi drops out while you're under the hood, your work is saved locally in your browser cache and will automatically sync to the cloud as soon as connection is restored.
 
 ---
 
@@ -205,10 +196,10 @@ As parts move through your shop, tap the status pill for each part:
   - **Phone Camera Quality**: You can also tap **"Phone Cam / Upload"** to snap a photo with your phone's native camera app. Native camera apps often have superior optical HDR and macro focus for small stamped metal plates.
 - **Worn or Damaged Stickers**: If a sticker is completely unreadable, use **Voice VIN** to dictate the 17 characters hands-free or type the digits. ShopWrench verifies the 9th check digit to make sure no letters or numbers were mistyped.
 
-### Cloud Sync & Login
-- **Same Account**: Ensure both your phone and PC are logged into the **same Google account or email address**.
-- **Check Status**: Look at the cloud button in the top-right. A green icon with **"Cloud Synced"** means live sync is active.
-- **Offline Mode**: If you see a yellow cloud icon, your changes are safely stored on your device and will push to the cloud as soon as you have internet access.
+### Cloud Sync
+- **Zero Login Required**: No email address or login is needed.
+- **Check Status**: Look at the cloud button in the top-right (**"Cloud Live"** with a pulsing green dot).
+- **Offline Mode**: If Wi-Fi drops, your changes are safely stored in your browser cache and will push to the cloud as soon as connection returns.
 
 ### Custom Suppliers
 - In any job, click **"Suppliers"** ➔ **"Add Custom Store"** to save your favorite local parts vendors, machine shops, or dealership wholesale counters.
