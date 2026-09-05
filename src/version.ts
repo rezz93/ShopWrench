@@ -7,10 +7,11 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.19',
+  version: '1.4.20',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v14',
+  build: 'rev-2026.09.05-v15',
   changes: [
+    'Fix Gemini transcription 400 error: strip codecs data-URL prefix before sending audio',
     'Speak VIN App Mic on phones now records continuously (no beeps, no keyboard) until you tap Stop, then Gemini transcribes the full VIN; PC keeps live recognition',
     'Gemini AI audio tab: show the actual server error instead of a generic message, allow up to 60s for transcription, and try gemini-flash-latest first',
     'Speak VIN App Mic: retry the Android speech-session restart with a short delay so a rejected restart no longer requires re-tapping the mic',

@@ -176,7 +176,7 @@ CRITICAL INSTRUCTIONS FOR DASHBOARD WINDSHIELD PLATES:
       }
 
       // Strip data URL header if present (e.g. data:audio/webm;codecs=opus;base64,...)
-      const cleanBase64 = audioBase64.replace(/^data:audio\/[a-zA-Z0-9.+_-]+;base64,/, '');
+      const cleanBase64 = audioBase64.replace(/^data:[^,]*;base64,/, '');
 
       // Normalize mimeType for Gemini: Gemini supports audio/webm, audio/mp4, audio/wav, audio/ogg, audio/mpeg, etc.
       let normalizedMime = mimeType.split(';')[0].trim();
