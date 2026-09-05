@@ -48,7 +48,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     startAiRecording,
     stopAiRecording,
   } = useVoiceInput({
-    continuous: false,
+    continuous: true,
     mode: 'vin',
     onResult: (transcript) => {
       setSpokenText(transcript);
@@ -108,7 +108,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     if (isListening) {
       stopListening();
     } else {
-      startListening();
+      startListening(parsedVin);
     }
   };
 
@@ -273,7 +273,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
               ) : (
                 <button
                   type="button"
-                  onClick={startListening}
+                  onClick={() => startListening(parsedVin)}
                   className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 hover:border-amber-400/50 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
                 >
                   <Mic className="w-3.5 h-3.5" />
@@ -283,7 +283,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-500 flex items-center gap-1">
-              <span>App mic closes cleanly when silence is reached so music/Spotify won't cut out.</span>
+              <span>Keeps listening through pauses. Stops at 17 characters, when you tap Stop, or after 10s of silence. Tap again to add more.</span>
             </p>
           </div>
         )}

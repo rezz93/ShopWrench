@@ -17,6 +17,8 @@ interface IWindow extends Window {
   webkitSpeechRecognition?: any;
 }
 
+const IDLE_TIMEOUT_MS = 10000;
+
 export interface UseVoiceInputOptions {
   onResult?: (transcript: string, isFinal: boolean) => void;
   onError?: (error: string) => void;
@@ -41,6 +43,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const audioChunksRef = useRef<Blob[]>([]);
   const isListeningRef = useRef(false);
   const isAiRecordingRef = useRef(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Confirmed text/VIN across paused speech bursts
   const confirmedVinRef = useRef('');
@@ -72,6 +75,13 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       reader.readAsDataURL(blob);
     });
   };
+
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  }, []);
 
   // Safe cleanup of media stream tracks
   const stopMediaStream = useCallback(() => {
@@ -230,8 +240,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
   }, [stopMediaStream]);
 
-  // Live SpeechRecognition with mathematical zero-duplication & mobile Spotify audio-focus protection
-  const startListening = useCallback(async () => {
+  // Live SpeechRecognition. Recognition sessions are chained across pauses until the
+  // user stops, the VIN reaches 17 characters, or IDLE_TIMEOUT_MS passes with no speech.
+  const startListening = useCallback(async (seed?: string) => {
     if (isListeningRef.current) return;
 
     // 1. Immediately dismiss any open virtual keyboard on phone to prevent keyboard mic conflict
@@ -244,17 +255,16 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
 
     setErrorMessage(null);
-    setTranscript('');
-    confirmedVinRef.current = '';
     latestBurstVinRef.current = '';
-    completedGeneralHistoryRef.current = '';
     latestGeneralBurstRef.current = '';
     audioChunksRef.current = [];
-
-    const isMobileDevice = typeof navigator !== 'undefined' && (
-      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
-      ('ontouchstart' in window && window.innerWidth < 1024)
-    );
+    if (mode === 'vin') {
+      confirmedVinRef.current = (seed || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
+      setTranscript(confirmedVinRef.current);
+    } else {
+      completedGeneralHistoryRef.current = seed || '';
+      setTranscript(completedGeneralHistoryRef.current);
+    }
 
     const win = typeof window !== 'undefined' ? (window as unknown as IWindow) : null;
     const SpeechRecognitionAPI = win?.SpeechRecognition || win?.webkitSpeechRecognition;
@@ -271,16 +281,37 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         }
 
         const recognition = new SpeechRecognitionAPI();
-        // On mobile, continuous: true is unsupported and causes Android to pause/unpause Spotify endlessly
-        recognition.continuous = !isMobileDevice && continuous;
+        recognition.continuous = continuous;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
         recognition.lang = lang;
+
+        const finishListening = () => {
+          clearIdleTimer();
+          isListeningRef.current = false;
+          setIsListening(false);
+          if (recognitionRef.current === recognition) {
+            recognitionRef.current = null;
+          }
+          try {
+            recognition.stop();
+          } catch {
+            // ignore
+          }
+        };
+
+        const armIdleTimer = () => {
+          clearIdleTimer();
+          idleTimerRef.current = setTimeout(() => {
+            if (isListeningRef.current) finishListening();
+          }, IDLE_TIMEOUT_MS);
+        };
 
         recognition.onstart = () => {
           isListeningRef.current = true;
           setIsListening(true);
           setErrorMessage(null);
+          armIdleTimer();
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -303,6 +334,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
           currentSessionText = currentSessionText.trim();
           if (!currentSessionText) return;
+          armIdleTimer();
 
           if (mode === 'vin') {
             // 1. Parse current burst into VIN characters using robust phonetic map
@@ -319,13 +351,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
             // Auto-stop if complete 17 characters achieved
             if (mergedVin.length >= 17) {
-              try {
-                recognition.stop();
-              } catch {
-                // ignore
-              }
-              isListeningRef.current = false;
-              setIsListening(false);
+              confirmedVinRef.current = mergedVin;
+              latestBurstVinRef.current = '';
+              finishListening();
             }
           } else {
             // General speech mode: smart deduplication across restarts
@@ -350,17 +378,14 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
           console.warn('SpeechRecognition status:', event.error);
-          if (event.error === 'no-speech') {
-            // On mobile, silence means listening finished naturally; close cleanly
-            if (isMobileDevice) {
-              isListeningRef.current = false;
-              setIsListening(false);
-            }
+          if (event.error === 'no-speech' || event.error === 'aborted') {
+            // onend follows and decides whether to chain a new session
             return;
           }
           if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
             // Fall back to AI audio recording
             console.info('Switching to MediaRecorder audio recording');
+            clearIdleTimer();
             startAiRecording();
             return;
           }
@@ -387,24 +412,19 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
             }
           }
 
-          // Mobile protection: On Android & iOS, do NOT auto-restart recognition inside onend!
-          // Auto-restarting on mobile Chrome grabs and drops audio focus every 2 seconds,
-          // which causes Spotify / background music to repeatedly cut out and back in.
-          if (isMobileDevice) {
-            isListeningRef.current = false;
-            setIsListening(false);
-            return;
-          }
-
-          // On desktop, keep listening if user hasn't explicitly stopped
-          if (isListeningRef.current) {
+          // Keep listening (chain a new session) until the user stops, the VIN is complete,
+          // or the idle timer fires. Android ends a session at every short pause, so this
+          // is what lets a full 17-character VIN be dictated in one go.
+          if (isListeningRef.current && recognitionRef.current === recognition) {
             try {
               recognition.start();
             } catch {
+              clearIdleTimer();
               setIsListening(false);
               isListeningRef.current = false;
             }
           } else {
+            clearIdleTimer();
             setIsListening(false);
             isListeningRef.current = false;
           }
@@ -422,11 +442,15 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
     // Fallback: Launch AI audio recording
     startAiRecording();
-  }, [continuous, lang, mode, startAiRecording]);
+  }, [clearIdleTimer, continuous, lang, mode, startAiRecording]);
 
   const stopListening = useCallback(() => {
+    clearIdleTimer();
     isListeningRef.current = false;
     setIsListening(false);
+    if (mode === 'vin' && latestBurstVinRef.current) {
+      confirmedVinRef.current = mergeVinSequences(confirmedVinRef.current, latestBurstVinRef.current);
+    }
     latestBurstVinRef.current = '';
     latestGeneralBurstRef.current = '';
 
@@ -446,7 +470,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     if (isAiRecordingRef.current) {
       stopAiRecording();
     }
-  }, [stopAiRecording]);
+  }, [clearIdleTimer, mode, stopAiRecording]);
 
   const toggleListening = useCallback(() => {
     if (isListeningRef.current) {
@@ -471,6 +495,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     return () => {
       isListeningRef.current = false;
       isAiRecordingRef.current = false;
+      clearIdleTimer();
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -480,7 +505,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       }
       stopMediaStream();
     };
-  }, [stopMediaStream]);
+  }, [clearIdleTimer, stopMediaStream]);
 
   return {
     isListening,
