@@ -416,38 +416,13 @@ export function formatAndParseVin(rawText: string): { vin: string; isConvertedFr
 }
 
 /**
- * Intelligent non-duplicating sequence merge:
- * Merges previous confirmed VIN characters with incoming speech result,
- * preventing Android Chrome's notorious utterance-repetition and compounding loops.
+ * Appends a new speech burst onto the confirmed VIN prefix. VINs legitimately
+ * repeat characters, so no overlap guessing is done.
  */
 export function mergeVinSequences(prefix: string, addition: string): string {
   const p = (prefix || '').trim().toUpperCase();
   const a = (addition || '').trim().toUpperCase();
 
-  if (!a) return p;
-  if (!p) return a.slice(0, 17);
-
-  // If addition already starts with prefix, addition is the authoritative latest state
-  if (a.startsWith(p)) {
-    return a.slice(0, 17);
-  }
-
-  // If prefix already contains addition completely at the beginning, don't duplicate
-  if (p.startsWith(a)) {
-    return p.slice(0, 17);
-  }
-
-  // Find longest overlapping suffix of prefix that matches the start of addition
-  const maxOverlap = Math.min(p.length, a.length);
-  for (let len = maxOverlap; len > 0; len--) {
-    if (p.endsWith(a.slice(0, len))) {
-      const merged = p + a.slice(len);
-      return merged.slice(0, 17);
-    }
-  }
-
-  // No overlap found: append addition to prefix
-  const combined = p + a;
-  return combined.slice(0, 17);
+  return (p + a).slice(0, 17);
 }
 
