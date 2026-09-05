@@ -48,6 +48,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   // Confirmed text/VIN across paused speech bursts
   const confirmedVinRef = useRef('');
   const latestBurstVinRef = useRef('');
+  const heardFinalRef = useRef('');
+  const [heardText, setHeardText] = useState('');
   const completedGeneralHistoryRef = useRef('');
   const latestGeneralBurstRef = useRef('');
 
@@ -278,6 +280,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     setErrorMessage(null);
     latestBurstVinRef.current = '';
     latestGeneralBurstRef.current = '';
+    heardFinalRef.current = '';
+    setHeardText('');
     audioChunksRef.current = [];
     if (mode === 'vin') {
       confirmedVinRef.current = sanitizeVinSeed(seed);
@@ -364,8 +368,11 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
                 confirmedVinRef.current,
                 parseSpokenVin(finalText)
               );
+              heardFinalRef.current = `${heardFinalRef.current} ${finalText}`.trim();
             }
             latestBurstVinRef.current = interimText ? parseSpokenVin(interimText) : '';
+            setHeardText(`${heardFinalRef.current} ${interimText}`.trim());
+            console.debug('[SpeakVIN] heard', { finalText, interimText, vin: confirmedVinRef.current, preview: latestBurstVinRef.current });
 
             const mergedVin = mergeVinSequences(confirmedVinRef.current, latestBurstVinRef.current);
             const isFinal = Boolean(finalText) && !interimText;
@@ -570,6 +577,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     isAiRecording,
     isProcessing,
     transcript,
+    heardText,
     isSupported,
     errorMessage,
     startListening,

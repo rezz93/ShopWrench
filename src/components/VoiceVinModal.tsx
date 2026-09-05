@@ -43,6 +43,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     isListening,
     isAiRecording,
     isProcessing,
+    heardText,
     startListening,
     stopListening,
     startAiRecording,
@@ -292,6 +293,12 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
                 </button>
               )}
             </div>
+
+            {heardText && (
+              <p className="text-[11px] text-slate-400 text-center break-words">
+                Heard: <span className="text-slate-200 italic">“{heardText}”</span>
+              </p>
+            )}
 
             <p className="text-[11px] text-slate-500 flex items-center gap-1">
               <span>Keeps listening through pauses (phones beep between phrases — that's normal). Stops at 17 characters, when you tap Stop, or after 10s of silence. Tap again to add more.</span>

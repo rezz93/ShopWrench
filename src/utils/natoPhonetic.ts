@@ -275,16 +275,18 @@ export function parseSpokenVin(transcript: string): string {
   if (!transcript) return '';
 
   // Clean, normalize and split tokens
-  const rawWords = transcript
-    .toUpperCase()
+  const originalWords = transcript
     .replace(/[.,/#!$%^&*;:{}=\-_`~()?"']/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
+  const rawWords = originalWords.map((w) => w.toUpperCase());
 
   let result = '';
 
   for (let i = 0; i < rawWords.length; i++) {
     const word = rawWords[i];
+    // Speech engines emit spelled-out letter runs in caps ("FTFW", "GTH") but real words in lowercase
+    const spelledOut = /^[A-Z0-9]+$/.test(originalWords[i]);
 
     // 1. Skip explicit conversational filler words
     if (IGNORE_WORDS.has(word)) {
@@ -359,9 +361,10 @@ export function parseSpokenVin(transcript: string): string {
     // If it's a short sequence or contains digits, treat each character directly.
     const cleanChars = word.replace(/[^A-Z0-9]/g, '');
     if (cleanChars.length > 0) {
-      // If it contains digits (like "41BT" or "1GTH6") or is 1-2 characters, accept it directly
+      // If it contains digits (like "41BT" or "1GTH6"), is 1-2 characters, or was spelled out
+      // in caps by the recognizer, accept it directly
       const hasDigit = /\d/.test(cleanChars);
-      if (hasDigit || cleanChars.length <= 2) {
+      if (hasDigit || cleanChars.length <= 2 || (spelledOut && cleanChars.length <= 17)) {
         result += cleanChars;
         continue;
       }
