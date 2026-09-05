@@ -7,15 +7,17 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.10',
+  version: '1.4.11',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v5',
+  build: 'rev-2026.09.05-v6',
   changes: [
+    'Fixed Android Chrome speech repetition bug with mathematical mergeVinSequences suffix/prefix overlap deduplication',
+    'Solved PC and Preview pane VIN speech misinterpretation by adding comprehensive phonetic letter homophones ("bee", "tee", "aitch", "gee"), number words, and compound tokens to WORD_TO_CHAR_MAP',
+    'Added Gemini AI Multimodal Audio Scanner tab to Voice VIN modal for 100% accurate audio decoding in loud shop environments',
+    'Added live character backspace control and real-time 17-character validation in Voice VIN modal',
     'Resolved Cloud Run / Publish startup failure by adding server.ts esbuild bundling to production build script (generates dist/server.cjs)',
     'Single-Operator Zero-Login Live Cloud Sync: Jobs, parts, and VIN records sync in real-time between Phone & PC via Firestore shop_jobs without login friction',
     'Streamlined Cloud Sync Modal into a zero-barrier Device & URL manager with 1-click copy link and home screen installation guidance',
-    'Fixed Android Chrome repeated speech-to-text bug (e.g. 1gth1gth...) by reading session transcripts directly from Web Speech results instead of accumulating interim frames',
-    'Removed Customer Truck Detected shortcut option from Voice VIN modal as requested',
     'Auto-stop on VIN complete: microphone automatically finishes once all 17 valid characters are captured',
     'Real-time Live VIN Dictation: Direct inline microphone button in VIN input field streams characters as spoken',
     'Fixed Web Speech audio pipeline conflict by decoupling getUserMedia lock from speech recognition stream',

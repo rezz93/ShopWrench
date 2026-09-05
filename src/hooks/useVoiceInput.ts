@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { parseSpokenVin } from '../utils/natoPhonetic';
+import { parseSpokenVin, mergeVinSequences } from '../utils/natoPhonetic';
 
 // SpeechRecognition type definitions for cross-browser support
 interface SpeechRecognitionErrorEvent extends Event {
@@ -29,6 +29,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const { onResult, onError, continuous = true, lang = 'en-US', mode = 'general' } = options;
 
   const [isListening, setIsListening] = useState(false);
+  const [isAiRecording, setIsAiRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -39,8 +40,13 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const isListeningRef = useRef(false);
-  const completedHistoryRef = useRef('');
-  const latestSessionTextRef = useRef('');
+  const isAiRecordingRef = useRef(false);
+
+  // Confirmed text/VIN across paused speech bursts
+  const confirmedVinRef = useRef('');
+  const latestBurstVinRef = useRef('');
+  const completedGeneralHistoryRef = useRef('');
+  const latestGeneralBurstRef = useRef('');
 
   // Stable refs for callbacks to prevent re-instantiation loops
   const onResultRef = useRef(onResult);
@@ -79,9 +85,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
   }, []);
 
-  // Transcribe recorded audio with server Gemini AI (fallback mode)
-  const transcribeFallbackAudio = useCallback(async (audioBlob: Blob, recordedMime: string) => {
+  // Transcribe recorded audio with server Gemini AI
+  const transcribeAudioWithAi = useCallback(async (audioBlob: Blob, recordedMime: string) => {
     if (audioBlob.size < 400) {
+      setIsProcessing(false);
       return;
     }
 
@@ -90,7 +97,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       const base64Data = await blobToBase64(audioBlob);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       const res = await fetch('/api/transcribe-audio', {
         method: 'POST',
@@ -120,11 +127,15 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
               onResultRef.current(resultText, true);
             }
           }
+        } else {
+          throw new Error(data.error || 'Server could not transcribe audio.');
         }
+      } else {
+        throw new Error(`HTTP Error ${res.status}`);
       }
     } catch (err: any) {
-      console.warn('Server fallback transcription error:', err);
-      const msg = 'Could not process audio. Please try speaking again.';
+      console.warn('AI audio transcription error:', err);
+      const msg = 'Could not transcribe audio. Please try speaking again or use live typing.';
       setErrorMessage(msg);
       if (onErrorRef.current) onErrorRef.current(msg);
     } finally {
@@ -132,8 +143,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
   }, [mode]);
 
-  // Fallback recorder if Web Speech is unavailable or errors
-  const startMediaRecorderFallback = useCallback(async () => {
+  // Start direct MediaRecorder for Gemini AI analysis
+  const startAiRecording = useCallback(async () => {
+    if (isAiRecordingRef.current) return;
     if (!navigator?.mediaDevices?.getUserMedia) {
       const msg = 'Microphone access is not supported in this browser.';
       setErrorMessage(msg);
@@ -142,6 +154,18 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
 
     try {
+      // Stop live recognition if active
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
+        recognitionRef.current = null;
+      }
+      setIsListening(false);
+      isListeningRef.current = false;
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -174,39 +198,54 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       recorder.onstop = () => {
         stopMediaStream();
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        transcribeFallbackAudio(audioBlob, mimeType);
+        transcribeAudioWithAi(audioBlob, mimeType);
       };
 
       recorder.start(500);
       mediaRecorderRef.current = recorder;
-      isListeningRef.current = true;
-      setIsListening(true);
+      isAiRecordingRef.current = true;
+      setIsAiRecording(true);
       setErrorMessage(null);
     } catch (err: any) {
-      console.warn('Fallback media recording error:', err);
-      const msg = 'Microphone permission was blocked or unavailable.';
+      console.warn('AI media recording launch error:', err);
+      const msg = 'Microphone permission was blocked. Please check browser permissions.';
       setErrorMessage(msg);
       if (onErrorRef.current) onErrorRef.current(msg);
-      isListeningRef.current = false;
-      setIsListening(false);
+      isAiRecordingRef.current = false;
+      setIsAiRecording(false);
     }
-  }, [stopMediaStream, transcribeFallbackAudio]);
+  }, [stopMediaStream, transcribeAudioWithAi]);
 
+  const stopAiRecording = useCallback(() => {
+    isAiRecordingRef.current = false;
+    setIsAiRecording(false);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        stopMediaStream();
+      }
+    } else {
+      stopMediaStream();
+    }
+  }, [stopMediaStream]);
+
+  // Live SpeechRecognition with mathematical zero-duplication
   const startListening = useCallback(async () => {
     if (isListeningRef.current) return;
     setErrorMessage(null);
     setTranscript('');
-    completedHistoryRef.current = '';
-    latestSessionTextRef.current = '';
+    confirmedVinRef.current = '';
+    latestBurstVinRef.current = '';
+    completedGeneralHistoryRef.current = '';
+    latestGeneralBurstRef.current = '';
     audioChunksRef.current = [];
 
     const win = typeof window !== 'undefined' ? (window as unknown as IWindow) : null;
     const SpeechRecognitionAPI = win?.SpeechRecognition || win?.webkitSpeechRecognition;
 
-    // 1. Primary: Native SpeechRecognition for immediate, real-time live typing
     if (SpeechRecognitionAPI) {
       try {
-        // Clean up any stale recognition session
         if (recognitionRef.current) {
           try {
             recognitionRef.current.abort();
@@ -229,98 +268,106 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let fullSessionText = '';
+          let currentSessionText = '';
           let isFinal = false;
 
-          // Standard W3C SpeechRecognition: event.results holds all transcript chunks for this session.
-          // Reading sequentially from index 0 to results.length - 1 extracts the exact transcript without duplicate compounding.
+          // Sequential read across all results for this active session
           for (let i = 0; i < event.results.length; ++i) {
-            const result = event.results[i];
-            if (result && result[0]) {
-              const text = result[0].transcript || '';
-              if (text) {
-                fullSessionText += ' ' + text;
+            const res = event.results[i];
+            if (res && res[0]) {
+              const chunk = res[0].transcript || '';
+              if (chunk) {
+                currentSessionText += ' ' + chunk;
               }
-              if (result.isFinal) {
+              if (res.isFinal) {
                 isFinal = true;
               }
             }
           }
 
-          fullSessionText = fullSessionText.trim();
-          if (!fullSessionText) return;
+          currentSessionText = currentSessionText.trim();
+          if (!currentSessionText) return;
 
-          // Handle multi-session continuation if Android or Chrome restarted after a pause
-          let rawCombined = fullSessionText;
-          if (completedHistoryRef.current) {
-            const prev = completedHistoryRef.current.trim();
-            // Prevent duplication if the new session repeats the previous text
-            if (fullSessionText.toLowerCase().startsWith(prev.toLowerCase())) {
-              rawCombined = fullSessionText;
-            } else if (prev.toLowerCase().endsWith(fullSessionText.toLowerCase())) {
-              rawCombined = prev;
-            } else {
-              rawCombined = `${prev} ${fullSessionText}`.trim();
-            }
-          }
-
-          latestSessionTextRef.current = fullSessionText;
-
-          let processed = rawCombined;
           if (mode === 'vin') {
-            const natoParsed = parseSpokenVin(rawCombined);
-            processed = natoParsed || rawCombined.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
-          }
+            // 1. Parse current burst into VIN characters using robust phonetic map
+            const burstVin = parseSpokenVin(currentSessionText);
+            latestBurstVinRef.current = burstVin;
 
-          setTranscript(processed);
-          if (onResultRef.current) {
-            onResultRef.current(processed, isFinal);
-          }
+            // 2. Mathematically merge with confirmed prior history (prevents Android duplication)
+            const mergedVin = mergeVinSequences(confirmedVinRef.current, burstVin);
 
-          // Auto-stop in VIN mode once a complete 17-character VIN is captured
-          if (mode === 'vin' && processed.length >= 17) {
-            try {
-              recognition.stop();
-            } catch {
-              // ignore
+            setTranscript(mergedVin);
+            if (onResultRef.current) {
+              onResultRef.current(mergedVin, isFinal);
             }
-            isListeningRef.current = false;
-            setIsListening(false);
+
+            // Auto-stop if complete 17 characters achieved
+            if (mergedVin.length >= 17) {
+              try {
+                recognition.stop();
+              } catch {
+                // ignore
+              }
+              isListeningRef.current = false;
+              setIsListening(false);
+            }
+          } else {
+            // General speech mode: smart deduplication across restarts
+            latestGeneralBurstRef.current = currentSessionText;
+            let fullText = currentSessionText;
+
+            if (completedGeneralHistoryRef.current) {
+              const prev = completedGeneralHistoryRef.current.trim();
+              if (currentSessionText.toLowerCase().startsWith(prev.toLowerCase())) {
+                fullText = currentSessionText;
+              } else {
+                fullText = `${prev} ${currentSessionText}`.trim();
+              }
+            }
+
+            setTranscript(fullText);
+            if (onResultRef.current) {
+              onResultRef.current(fullText, isFinal);
+            }
           }
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.warn('SpeechRecognition notice:', event.error);
+          console.warn('SpeechRecognition status:', event.error);
           if (event.error === 'no-speech') {
-            // Non-fatal pause in speech
             return;
           }
           if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            // Fall back to MediaRecorder + Gemini
-            console.info('Switching to MediaRecorder audio fallback due to Web Speech restrictions');
-            startMediaRecorderFallback();
-            return;
-          }
-          if (event.error === 'network') {
-            // On network failure with Web Speech, fall back to backend Gemini
-            startMediaRecorderFallback();
+            // Fall back to AI audio recording
+            console.info('Switching to MediaRecorder audio recording');
+            startAiRecording();
             return;
           }
         };
 
         recognition.onend = () => {
           if (isListeningRef.current) {
-            // Save current session text to completed history to maintain continuity across silent pauses
-            if (latestSessionTextRef.current) {
-              const prev = completedHistoryRef.current.trim();
-              const curr = latestSessionTextRef.current.trim();
-              if (!prev.toLowerCase().includes(curr.toLowerCase())) {
-                completedHistoryRef.current = prev ? `${prev} ${curr}` : curr;
+            // Commit latest burst into confirmed history
+            if (mode === 'vin') {
+              if (latestBurstVinRef.current) {
+                confirmedVinRef.current = mergeVinSequences(
+                  confirmedVinRef.current,
+                  latestBurstVinRef.current
+                );
+                latestBurstVinRef.current = '';
               }
-              latestSessionTextRef.current = '';
+            } else {
+              if (latestGeneralBurstRef.current) {
+                const prev = completedGeneralHistoryRef.current.trim();
+                const curr = latestGeneralBurstRef.current.trim();
+                if (!prev.toLowerCase().includes(curr.toLowerCase())) {
+                  completedGeneralHistoryRef.current = prev ? `${prev} ${curr}` : curr;
+                }
+                latestGeneralBurstRef.current = '';
+              }
             }
 
-            // Auto-restart if user hasn't explicitly stopped
+            // Keep listening if user hasn't tapped stop
             try {
               recognition.start();
             } catch {
@@ -339,19 +386,19 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         setIsListening(true);
         return;
       } catch (err) {
-        console.warn('Could not launch SpeechRecognition, trying MediaRecorder fallback:', err);
+        console.warn('Could not start SpeechRecognition, starting AI audio recording fallback:', err);
       }
     }
 
-    // 2. Fallback: If SpeechRecognitionAPI is not available
-    startMediaRecorderFallback();
-  }, [continuous, lang, mode, startMediaRecorderFallback]);
+    // Fallback: Launch AI audio recording
+    startAiRecording();
+  }, [continuous, lang, mode, startAiRecording]);
 
   const stopListening = useCallback(() => {
     isListeningRef.current = false;
     setIsListening(false);
-    completedHistoryRef.current = '';
-    latestSessionTextRef.current = '';
+    latestBurstVinRef.current = '';
+    latestGeneralBurstRef.current = '';
 
     if (recognitionRef.current) {
       try {
@@ -366,16 +413,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       recognitionRef.current = null;
     }
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch {
-        stopMediaStream();
-      }
-    } else {
-      stopMediaStream();
+    if (isAiRecordingRef.current) {
+      stopAiRecording();
     }
-  }, [stopMediaStream]);
+  }, [stopAiRecording]);
 
   const toggleListening = useCallback(() => {
     if (isListeningRef.current) {
@@ -387,8 +428,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
   const resetTranscript = useCallback(() => {
     setTranscript('');
-    completedHistoryRef.current = '';
-    latestSessionTextRef.current = '';
+    confirmedVinRef.current = '';
+    latestBurstVinRef.current = '';
+    completedGeneralHistoryRef.current = '';
+    latestGeneralBurstRef.current = '';
     setErrorMessage(null);
     audioChunksRef.current = [];
   }, []);
@@ -397,6 +440,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   useEffect(() => {
     return () => {
       isListeningRef.current = false;
+      isAiRecordingRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -410,6 +454,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
   return {
     isListening,
+    isAiRecording,
     isProcessing,
     transcript,
     isSupported,
@@ -417,6 +462,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     startListening,
     stopListening,
     toggleListening,
+    startAiRecording,
+    stopAiRecording,
     resetTranscript,
   };
 }
+

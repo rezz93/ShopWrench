@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, AlertCircle, RotateCcw, Check, X, Volume2, Loader2, Play, Square } from 'lucide-react';
+import {
+  Mic,
+  AlertCircle,
+  RotateCcw,
+  Check,
+  X,
+  Volume2,
+  Loader2,
+  Square,
+  Sparkles,
+  Radio,
+  Delete,
+} from 'lucide-react';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 import { parseSpokenVin } from '../utils/natoPhonetic';
 
@@ -16,26 +28,26 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
   onVinConfirmed,
   initialVin = '',
 }) => {
+  const [activeTab, setActiveTab] = useState<'live' | 'ai'>('live');
   const [spokenText, setSpokenText] = useState('');
   const [parsedVin, setParsedVin] = useState(initialVin);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     isListening,
+    isAiRecording,
     isProcessing,
-    isSupported,
     startListening,
     stopListening,
-    toggleListening,
+    startAiRecording,
+    stopAiRecording,
   } = useVoiceInput({
     continuous: true,
     mode: 'vin',
-    onResult: (transcript, isFinal) => {
+    onResult: (transcript) => {
       setSpokenText(transcript);
-      // Real-time parsing of NATO words and alphanumeric characters for any length (1 to 17)
-      const clean = parseSpokenVin(transcript) || transcript.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
-      if (clean) {
-        setParsedVin(clean);
+      if (transcript) {
+        setParsedVin(transcript);
         setErrorMessage(null);
       }
     },
@@ -52,14 +64,16 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
       setErrorMessage(null);
     } else {
       stopListening();
+      stopAiRecording();
     }
-  }, [isOpen, initialVin, stopListening]);
+  }, [isOpen, initialVin, stopListening, stopAiRecording]);
 
   if (!isOpen) return null;
 
   const handleConfirm = () => {
     if (parsedVin.length > 0) {
       stopListening();
+      stopAiRecording();
       onVinConfirmed(parsedVin);
       onClose();
     }
@@ -69,6 +83,26 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     setSpokenText('');
     setParsedVin('');
     setErrorMessage(null);
+  };
+
+  const handleBackspace = () => {
+    setParsedVin((prev) => prev.slice(0, -1));
+  };
+
+  const toggleLiveMic = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const toggleAiRecording = () => {
+    if (isAiRecording) {
+      stopAiRecording();
+    } else {
+      startAiRecording();
+    }
   };
 
   return (
@@ -88,7 +122,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
                 Voice VIN Dictation
               </h3>
               <p className="text-xs text-slate-400">
-                Speak letters, numbers, or NATO words (e.g. &quot;One Golf Tango Hotel...&quot;)
+                Speak individual letters, NATO words, or record full audio
               </p>
             </div>
           </div>
@@ -100,46 +134,103 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
           </button>
         </div>
 
-        {/* Live Mic Animation & Status */}
-        <div className="flex flex-col items-center justify-center py-5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+        {/* Mode Selector Tabs */}
+        <div className="grid grid-cols-2 p-1 bg-slate-950/90 rounded-xl border border-slate-800 text-xs font-bold">
           <button
             type="button"
-            onClick={toggleListening}
-            disabled={isProcessing}
-            className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
-              isProcessing
-                ? 'bg-amber-500/20 text-amber-300 border-2 border-amber-400 cursor-wait'
-                : isListening
-                ? 'bg-rose-500 text-white shadow-rose-500/40 scale-105 animate-pulse'
-                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-amber-500/20 hover:scale-105'
+            onClick={() => {
+              stopAiRecording();
+              setActiveTab('live');
+            }}
+            className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
+              activeTab === 'live'
+                ? 'bg-amber-500 text-slate-950 font-black shadow'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
-            {isProcessing ? (
-              <Loader2 className="w-9 h-9 text-amber-400 animate-spin" />
-            ) : isListening ? (
-              <Square className="w-8 h-8 text-white fill-current" />
-            ) : (
-              <Mic className="w-9 h-9 text-slate-950" />
-            )}
+            <Radio className="w-3.5 h-3.5" />
+            <span>⚡ Live Dictation</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              stopListening();
+              setActiveTab('ai');
+            }}
+            className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
+              activeTab === 'ai'
+                ? 'bg-amber-500 text-slate-950 font-black shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>🧠 Gemini AI Audio</span>
+          </button>
+        </div>
+
+        {/* Live Mic Animation & Status */}
+        <div className="flex flex-col items-center justify-center py-5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+          {activeTab === 'live' ? (
+            <button
+              type="button"
+              onClick={toggleLiveMic}
+              disabled={isProcessing}
+              className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
+                isListening
+                  ? 'bg-rose-500 text-white shadow-rose-500/40 scale-105 animate-pulse'
+                  : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-amber-500/20 hover:scale-105'
+              }`}
+            >
+              {isListening ? (
+                <Square className="w-8 h-8 text-white fill-current" />
+              ) : (
+                <Mic className="w-9 h-9 text-slate-950" />
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleAiRecording}
+              disabled={isProcessing}
+              className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
+                isProcessing
+                  ? 'bg-purple-600/30 text-purple-300 border-2 border-purple-400 cursor-wait'
+                  : isAiRecording
+                  ? 'bg-rose-600 text-white shadow-rose-600/50 scale-105 animate-pulse'
+                  : 'bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-purple-600/30 hover:scale-105'
+              }`}
+            >
+              {isProcessing ? (
+                <Loader2 className="w-9 h-9 text-purple-300 animate-spin" />
+              ) : isAiRecording ? (
+                <Square className="w-8 h-8 text-white fill-current" />
+              ) : (
+                <Sparkles className="w-9 h-9 text-white" />
+              )}
+            </button>
+          )}
 
           <div className="text-center space-y-1">
             <span
               className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${
                 isProcessing
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : isListening
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  : isListening || isAiRecording
                   ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                   : 'bg-slate-800 text-slate-300 border border-slate-700'
               }`}
             >
               {isProcessing
-                ? 'Transcribing with Gemini AI...'
+                ? 'Gemini AI Decoding VIN...'
                 : isListening
                 ? parsedVin.length > 0
-                  ? `Listening... ${parsedVin.length}/17 Captured`
-                  : 'Listening... Speak characters or NATO words'
-                : 'Tap to Start Speaking'}
+                  ? `Live: ${parsedVin.length}/17 Characters`
+                  : 'Listening... Speak letters or NATO words'
+                : isAiRecording
+                ? 'Recording Audio... Tap to Analyze'
+                : activeTab === 'live'
+                ? 'Tap Mic to Start Speaking'
+                : 'Tap to Record Spoken VIN for AI'}
             </span>
             {spokenText && (
               <p className="text-xs text-slate-400 italic max-w-sm px-4 truncate">
@@ -148,26 +239,46 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             )}
           </div>
 
-          {/* Explicit Start/Stop controls */}
+          {/* Action Control Button */}
           <div className="flex items-center gap-2 pt-1">
-            {isListening ? (
+            {activeTab === 'live' ? (
+              isListening ? (
+                <button
+                  type="button"
+                  onClick={stopListening}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>Done Speaking</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startListening}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 hover:border-amber-400/50 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Start Microphone</span>
+                </button>
+              )
+            ) : isAiRecording ? (
               <button
                 type="button"
-                onClick={stopListening}
+                onClick={stopAiRecording}
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
               >
                 <Square className="w-3.5 h-3.5 fill-current" />
-                <span>Done Speaking</span>
+                <span>Stop & Decode with AI</span>
               </button>
             ) : (
               <button
                 type="button"
-                onClick={startListening}
+                onClick={startAiRecording}
                 disabled={isProcessing}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 hover:border-amber-400/50 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
+                className="px-4 py-2 rounded-xl bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 hover:border-purple-400 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
               >
-                <Mic className="w-3.5 h-3.5" />
-                <span>Start Microphone</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Record for AI Analysis</span>
               </button>
             )}
           </div>
@@ -177,20 +288,45 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-300">
             <span>Recognized VIN:</span>
-            <span className={`font-mono ${parsedVin.length === 17 ? 'text-emerald-400 font-black' : 'text-amber-400'}`}>
+            <span
+              className={`font-mono ${
+                parsedVin.length === 17
+                  ? 'text-emerald-400 font-black'
+                  : 'text-amber-400'
+              }`}
+            >
               {parsedVin.length}/17 characters
             </span>
           </div>
 
-          <div className="relative">
+          <div className="relative flex items-center">
             <input
               type="text"
               maxLength={17}
               value={parsedVin}
-              onChange={(e) => setParsedVin(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              onChange={(e) =>
+                setParsedVin(
+                  e.target.value
+                    .toUpperCase()
+                    .replace(/I/g, '1')
+                    .replace(/O/g, '0')
+                    .replace(/Q/g, '0')
+                    .replace(/[^A-HJ-NPR-Z0-9]/g, '')
+                )
+              }
               placeholder="Spoken VIN will appear here..."
-              className="w-full text-center font-mono text-xl sm:text-2xl font-black tracking-widest text-white bg-slate-950 border-2 border-amber-500/80 rounded-xl py-3 px-3 shadow-inner focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full text-center font-mono text-xl sm:text-2xl font-black tracking-widest text-white bg-slate-950 border-2 border-amber-500/80 rounded-xl py-3 px-10 shadow-inner focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
+            {parsedVin.length > 0 && (
+              <button
+                type="button"
+                onClick={handleBackspace}
+                title="Backspace (Remove last character)"
+                className="absolute right-3 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+              >
+                <Delete className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <p className="text-[11px] text-slate-500 text-center">
@@ -230,12 +366,14 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
         <div className="p-2.5 bg-slate-950/50 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
           <span className="font-bold text-slate-300 flex items-center gap-1">
             <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-            Tips for accurate speech recognition:
+            Tips for maximum speech accuracy:
           </span>
           <p className="text-slate-400 leading-relaxed">
             • Speak digits/letters: <span className="text-amber-300 font-mono">1 G T H 6 B E N 9 J...</span>
             <br />
             • Or NATO words: <span className="text-amber-300">One Golf Tango Hotel Six Bravo...</span>
+            <br />
+            • Noisy bay? Tap <strong>🧠 Gemini AI Audio</strong> to record and AI-decode the whole VIN.
           </p>
         </div>
 
@@ -264,3 +402,4 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     </div>
   );
 };
+
