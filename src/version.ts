@@ -7,10 +7,21 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.12',
+  version: '1.4.14',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v7',
+  build: 'rev-2026.09.05-v9',
   changes: [
+    'Added Manual Vehicle Entry mode to start new jobs with Year, Make, Model, Style & Engine without requiring a 17-digit VIN',
+    'Provided tactile quick-chips for common model years (2000-2025), popular shop makes (Ford, Chevy, Toyota, Honda, GMC, Ram, etc.), body styles (Crew Cab, Extended Cab, Sedan, SUV, etc.), and engine displacements',
+    'Integrated voice dictation for all manual vehicle input fields (Make, Model, Style, Engine, Customer Name, Symptoms, Parts)',
+    'Added live interactive Vehicle Preview card showing dynamic year/make/model/style specifications as the technician types',
+    'Made VIN completely optional across all parts catalogs (RockAuto, OEM dealership portals, Google Shopping, eBay) with automatic Year/Make/Model fallback',
+    'Added comprehensive OEM Parts & Schematics Lookup module directly under active vehicle jobs',
+    'Auto-detects vehicle make to launch official dealership OEM factory catalogs (GM Genuine, Ford Motorcraft, Mopar, Toyota, Honda, Nissan, Subaru, etc.) with prefilled VIN',
+    'Added 1-click OEM Exploded Assembly Schematics, Genuine Brand-New OEM eBay inventory, and Local Dealership Wholesale Counter finder',
+    'Integrated Gemini AI OEM Specs & Part # Assistant for authentic factory part numbers, superseded numbers, bolt torque specs, and OEM fluid capacities',
+    'Added 1-tap "+ Add to Job" button to immediately add discovered OEM parts to the active job scratchpad',
+    'Added OEM punch-out sourcing button to individual part checklist items',
     'Removed all email authentication requirements and legacy email methods; app operates on 100% zero-login instant Firestore synchronization',
     'Updated documentation to clarify zero-login device linking via direct URL',
     'Fixed Android Chrome speech repetition bug with mathematical mergeVinSequences suffix/prefix overlap deduplication',

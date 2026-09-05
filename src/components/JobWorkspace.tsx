@@ -19,6 +19,7 @@ import {
   Store,
   Activity,
   Search,
+  Compass,
 } from 'lucide-react';
 import {
   addPartToJob,
@@ -31,6 +32,8 @@ import {
 import { Job, JobStatus, PartItem, PartStatus } from '../types';
 import { PartsSupplierModal } from './PartsSupplierModal';
 import { AUTO_PARTS_STORES, formatPartSearchQuery, buildRockAutoCatalogUrl } from '../services/partsStores';
+import { getOemPortalForMake } from '../services/oemCatalogService';
+import { OemPartsLookup } from './OemPartsLookup';
 import { VoiceInputButton } from './VoiceInputButton';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
@@ -149,8 +152,8 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
   // Grabs active vehicle attributes (Year Make Model Engine) + specific part name,
   // normalizes query using formatPartSearchQuery,
   // copies search query to clipboard with instant visual feedback,
-  // and opens target sourcing catalog directly on RockAuto or Google Shopping.
-  const handleFindPart = (partName: string, provider: 'google' | 'rockauto' = 'rockauto') => {
+  // and opens target sourcing catalog directly on RockAuto, OEM Dealership catalog, or Google Shopping.
+  const handleFindPart = (partName: string, provider: 'google' | 'rockauto' | 'oem' = 'rockauto') => {
     const { cleanPart, fullQuery } = formatPartSearchQuery(
       vehicle.year,
       vehicle.make,
@@ -159,8 +162,8 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
       partName
     );
 
-    // Copy to system clipboard cleanly (part name for RockAuto, full query for Google Shopping)
-    const textToCopy = provider === 'rockauto' ? cleanPart : fullQuery;
+    // Copy to system clipboard cleanly (part name for RockAuto/OEM, full query for Google Shopping)
+    const textToCopy = (provider === 'rockauto' || provider === 'oem') ? cleanPart : fullQuery;
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopiedSearchPrompt(textToCopy);
       setTimeout(() => setCopiedSearchPrompt(null), 3500);
@@ -177,6 +180,12 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
         vehicle.engine || '',
         partName
       );
+    } else if (provider === 'oem') {
+      // Direct OEM Factory Dealership Portal with VIN or Year/Make/Model
+      const oemPortal = getOemPortalForMake(vehicle.make);
+      targetUrl = job.vin
+        ? oemPortal.buildVinCatalogUrl(job.vin, cleanPart)
+        : oemPortal.buildPartCatalogUrl(vehicle.year, vehicle.make, vehicle.model, cleanPart, vehicle.engine || '');
     } else {
       // Google Shopping direct punch-out
       targetUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(fullQuery)}`;
@@ -278,7 +287,9 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
               {vehicle.year} {vehicle.make} {vehicle.model}
-              {vehicle.trim ? ` ${vehicle.trim}` : ''}
+              {vehicle.style || vehicle.trim ? (
+                <span className="text-amber-400 font-bold ml-2">({vehicle.style || vehicle.trim})</span>
+              ) : null}
             </h1>
             <div className="flex items-center gap-2 text-sm text-slate-300 font-medium">
               <User className="w-4 h-4 text-slate-400" />
@@ -286,30 +297,40 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
             </div>
           </div>
 
-          {/* VIN Badge with 1-Tap Copy */}
+          {/* VIN Badge with 1-Tap Copy or Manual Entry indicator */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
             <div>
-              <span className="text-[10px] text-slate-400 block font-mono uppercase">Decoded VIN</span>
-              <span className="font-mono text-sm font-bold text-amber-400">{job.vin}</span>
+              <span className="text-[10px] text-slate-400 block font-mono uppercase">
+                {job.vin ? 'Decoded VIN' : 'Vehicle Specification'}
+              </span>
+              <span className="font-mono text-sm font-bold text-amber-400">
+                {job.vin || 'Manual Entry (No VIN)'}
+              </span>
             </div>
-            <button
-              id="copy-vin-btn"
-              onClick={handleCopyVin}
-              className="min-h-[40px] px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition"
-              title="Copy VIN to clipboard"
-            >
-              {copiedVin ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
+            {job.vin ? (
+              <button
+                id="copy-vin-btn"
+                onClick={handleCopyVin}
+                className="min-h-[40px] px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition"
+                title="Copy VIN to clipboard"
+              >
+                {copiedVin ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20">
+                No VIN Required
+              </span>
+            )}
           </div>
         </div>
 
@@ -336,9 +357,9 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
           </div>
 
           <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
-            <span className="text-xs text-slate-400 block font-medium">Body Style</span>
+            <span className="text-xs text-slate-400 block font-medium">Body Style / Trim</span>
             <span className="text-sm font-bold text-slate-200 mt-0.5 block truncate">
-              {vehicle.bodyClass || 'Passenger'}
+              {vehicle.style || vehicle.bodyClass || vehicle.trim || 'Standard'}
             </span>
           </div>
 
@@ -358,14 +379,21 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
               Shop Diagnosis &amp; Work Order Notes
             </span>
             <div className="flex items-center gap-2">
+              <a
+                href="#active-job-oem-parts-lookup"
+                className="min-h-[34px] px-3 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              >
+                <Compass className="w-3.5 h-3.5 text-amber-400" />
+                <span>OEM Lookup</span>
+              </a>
               {onOpenObdLookup && (
                 <button
                   id="job-open-obd-lookup-btn"
                   onClick={() => onOpenObdLookup(job)}
-                  className="min-h-[34px] px-3 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                  className="min-h-[34px] px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
                 >
                   <Activity className="w-3.5 h-3.5 text-amber-400" />
-                  <span>OBD-II Code Lookup</span>
+                  <span>OBD-II Codes</span>
                 </button>
               )}
               {isEditingNotes && (
@@ -433,6 +461,9 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
           )}
         </div>
       </div>
+
+      {/* OEM Parts & Factory Schematics Lookup */}
+      <OemPartsLookup job={job} onJobUpdated={onJobUpdated} />
 
       {/* MILESTONE 4: Active Jobs Workspace & The Parts Builder */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-xl space-y-6">
@@ -631,6 +662,16 @@ export const JobWorkspace: React.FC<JobWorkspaceProps> = ({
                         >
                           <Store className="w-3.5 h-3.5 text-amber-400 group-hover:text-slate-950 transition" />
                           <span>Find Stores</span>
+                        </button>
+
+                        <button
+                          id={`find-part-oem-${part.id}`}
+                          onClick={() => handleFindPart(part.part_name, 'oem')}
+                          className="min-h-[44px] px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 text-xs border border-slate-700 transition flex items-center gap-1"
+                          title="Open official OEM factory catalog with vehicle VIN"
+                        >
+                          <Compass className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold hidden sm:inline">OEM</span>
                         </button>
 
                         <button

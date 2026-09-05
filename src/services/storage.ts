@@ -199,7 +199,7 @@ async function deleteJobFromFirestore(jobId: string): Promise<void> {
 
 export function createNewJob(params: {
   customer_name: string;
-  vin: string;
+  vin?: string;
   vehicle_details: VehicleDetails;
   service_notes?: string;
   initial_parts?: string[];
@@ -208,7 +208,7 @@ export function createNewJob(params: {
     id: `job-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
     status: 'In Progress',
     customer_name: params.customer_name.trim() || 'Walk-In Customer',
-    vin: params.vin.trim().toUpperCase(),
+    vin: (params.vin || '').trim().toUpperCase(),
     vehicle_details: params.vehicle_details,
     parts_list: (params.initial_parts || []).map((name, idx) => ({
       id: `p-${Date.now()}-${idx}`,

@@ -9,6 +9,7 @@ export interface VehicleDetails {
   engine: string;
   drivetrain: string;
   trim?: string;
+  style?: string;
   bodyClass?: string;
   fuelType?: string;
   transmission?: string;

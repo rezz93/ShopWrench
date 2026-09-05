@@ -203,6 +203,25 @@ export function deleteCustomStore(id: string): void {
 }
 
 export const AUTO_PARTS_STORES: AutoPartsStore[] = [
+  // --- OEM FACTORY & DEALERSHIP WHOLESALE ---
+  {
+    id: 'oem_dealer_wholesale',
+    name: 'Official OEM Dealership Parts Catalog',
+    shortName: 'OEM Factory Parts',
+    tagline: 'Brand-specific factory parts, schematics & OEM dealer wholesale catalogs',
+    category: 'Warehouse Catalog',
+    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    accentColor: 'text-amber-400 hover:border-amber-500',
+    buildSearchUrl: (year, make, model, _engine, partName) => {
+      const q = `${year} ${make} ${model} ${partName} official OEM factory parts dealer wholesale catalog`.trim();
+      return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+    },
+    buildDirectProductUrl: (year, make, model, _engine, partName) => {
+      const q = `${year} ${make} ${model} ${partName} OEM genuine part number diagram`.trim();
+      return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+    },
+  },
+
   // --- JUNKYARDS & RECYCLED OEM PARTS ---
   {
     id: 'car_part',

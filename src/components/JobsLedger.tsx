@@ -63,7 +63,7 @@ export const JobsLedger: React.FC<JobsLedgerProps> = ({
     const v = job.vehicle_details;
     const vehicleStr = `${v.year} ${v.make} ${v.model} ${v.engine} ${v.drivetrain}`.toLowerCase();
     const customerStr = job.customer_name.toLowerCase();
-    const vinStr = job.vin.toLowerCase();
+    const vinStr = (job.vin || '').toLowerCase();
     const notesStr = (job.service_notes || '').toLowerCase();
     const partsStr = job.parts_list.map((p) => p.part_name.toLowerCase()).join(' ');
 
@@ -420,29 +420,35 @@ export const JobsLedger: React.FC<JobsLedgerProps> = ({
                     </div>
                   </div>
 
-                  {/* VIN Badge with Quick Copy */}
+                  {/* VIN Badge with Quick Copy or Manual Entry indicator */}
                   <div className="flex items-center justify-between px-3 py-2 bg-slate-950/40 rounded-lg border border-slate-800/80 text-xs">
                     <div className="font-mono text-slate-400 truncate mr-2">
-                      VIN: <span className="text-slate-300 font-semibold">{job.vin}</span>
+                      VIN: <span className="text-slate-300 font-semibold">{job.vin || 'Manual Entry (No VIN)'}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopyVin(e, job.vin, job.id)}
-                      className="text-slate-400 hover:text-amber-300 flex items-center gap-1 text-[11px] font-bold"
-                      title="Copy VIN"
-                    >
-                      {copiedVinId === job.id ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-400">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
+                    {job.vin ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyVin(e, job.vin, job.id)}
+                        className="text-slate-400 hover:text-amber-300 flex items-center gap-1 text-[11px] font-bold"
+                        title="Copy VIN"
+                      >
+                        {copiedVinId === job.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        Manual
+                      </span>
+                    )}
                   </div>
 
                   {/* Diagnostic Notes snippet if present */}

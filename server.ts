@@ -322,6 +322,122 @@ Return JSON with:
     }
   });
 
+  // OEM Parts & Factory Fitment Lookup Endpoint
+  app.post('/api/oem-lookup', async (req, res) => {
+    try {
+      const { year, make, model, engine = '', vin = '', partQuery = '' } = req.body;
+
+      if (!partQuery && !vin) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide either a part name or vehicle details for OEM lookup.',
+        });
+      }
+
+      const ai = getGeminiClient();
+
+      const prompt = `You are an elite master automotive technician and dealership wholesale parts counter manager.
+Provide authentic OEM (Original Equipment Manufacturer) factory parts data, OEM part numbers, and factory mechanical specs for this vehicle:
+
+Vehicle: ${year || ''} ${make || ''} ${model || ''} ${engine ? `(${engine})` : ''}
+VIN: ${vin || 'Not specified'}
+Requested Component / Assembly: "${partQuery || 'Common replacement parts'}"
+
+Provide:
+1. "oemBrand": The factory OEM parts division (e.g., "GM Genuine Parts & ACDelco", "Motorcraft / Ford OE", "Mopar Genuine Parts", "Toyota Genuine Parts", "Honda Genuine Parts", etc.).
+2. "oemPartNumbers": An array of probable authentic OEM part numbers for this component with:
+   - "partNumber": Standard alphanumeric OEM part number (e.g. "12637629", "DG511", "68197867AB").
+   - "brand": Division or manufacturer (e.g. "GM Genuine", "ACDelco OE", "Motorcraft").
+   - "description": Exact technical component description.
+   - "isSuperseded": Boolean indicating if this is an older superseded number.
+3. "supersededNumbers": Array of older part numbers that were replaced or updated by the manufacturer.
+4. "torqueSpecs": Key factory torque specifications for this component (e.g. "Water pump bolts: 89 in-lbs", "Caliper bracket bolts: 122 ft-lbs").
+5. "fluidAndSpecs": OEM fluid specifications and capacities if related (e.g., "Dex-Cool 50/50 - 13.4 qts", "DOT 4 Brake Fluid", "Dexron VI ATF").
+6. "techTips": 2-3 brief professional shop tips, installation bulletins, or gotchas for this repair.
+
+Return strictly JSON matching this structure.`;
+
+      const modelsToTry = ['gemini-3.8-flash', 'gemini-flash-latest'];
+      let response: any = null;
+      let lastErr: any = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  oemBrand: { type: Type.STRING },
+                  partQuery: { type: Type.STRING },
+                  oemPartNumbers: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        partNumber: { type: Type.STRING },
+                        brand: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        isSuperseded: { type: Type.BOOLEAN },
+                      },
+                      required: ['partNumber', 'brand', 'description'],
+                    },
+                  },
+                  supersededNumbers: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  torqueSpecs: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  fluidAndSpecs: { type: Type.STRING },
+                  techTips: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                },
+                required: ['oemBrand', 'oemPartNumbers'],
+              },
+            },
+          });
+          if (response?.text) {
+            break;
+          }
+        } catch (mErr: any) {
+          lastErr = mErr;
+          console.warn(`Model ${modelName} failed for OEM lookup:`, mErr?.message || mErr);
+        }
+      }
+
+      if (!response?.text) {
+        throw lastErr || new Error('OEM lookup service was temporarily unavailable.');
+      }
+
+      let text = response.text.trim();
+      if (text.startsWith('```')) {
+        text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+      }
+
+      const result = JSON.parse(text);
+
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } catch (err: unknown) {
+      console.error('OEM lookup error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown OEM lookup error';
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
+    }
+  });
+
   // Vite middleware in dev, static files in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
