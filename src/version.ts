@@ -7,10 +7,11 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.17',
+  version: '1.4.18',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v12',
+  build: 'rev-2026.09.05-v13',
   changes: [
+    'Gemini AI audio tab: show the actual server error instead of a generic message, allow up to 60s for transcription, and try gemini-flash-latest first',
     'Speak VIN App Mic: retry the Android speech-session restart with a short delay so a rejected restart no longer requires re-tapping the mic',
     'Speak VIN App Mic now keeps listening through pauses on Android until all 17 characters are captured, Stop is tapped, or 10s of silence passes; re-tapping the mic appends to the existing VIN instead of replacing it',
     'Resolved Android Chrome & phone audio-focus collision with Spotify: removed aggressive onend speech recognition restart loop that previously caused music to oscillate and cut out',
