@@ -7,10 +7,13 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.7',
+  version: '1.4.8',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v2',
+  build: 'rev-2026.09.05-v3',
   changes: [
+    'Fixed Android Chrome repeated speech-to-text bug (e.g. 1gth1gth...) by reading session transcripts directly from Web Speech results instead of accumulating interim frames',
+    'Removed Customer Truck Detected shortcut option from Voice VIN modal as requested',
+    'Auto-stop on VIN complete: microphone automatically finishes once all 17 valid characters are captured',
     'Real-time Live VIN Dictation: Direct inline microphone button in VIN input field streams characters as spoken',
     'Fixed Web Speech audio pipeline conflict by decoupling getUserMedia lock from speech recognition stream',
     'Real-time NATO phonetic & digit parsing for any length (1-17 characters) with instant UI synchronization',

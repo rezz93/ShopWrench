@@ -39,7 +39,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const isListeningRef = useRef(false);
-  const accumulatedFinalRef = useRef('');
+  const completedHistoryRef = useRef('');
+  const latestSessionTextRef = useRef('');
 
   // Stable refs for callbacks to prevent re-instantiation loops
   const onResultRef = useRef(onResult);
@@ -195,7 +196,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     if (isListeningRef.current) return;
     setErrorMessage(null);
     setTranscript('');
-    accumulatedFinalRef.current = '';
+    completedHistoryRef.current = '';
+    latestSessionTextRef.current = '';
     audioChunksRef.current = [];
 
     const win = typeof window !== 'undefined' ? (window as unknown as IWindow) : null;
@@ -227,35 +229,63 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let currentInterim = '';
-          let finalChunk = '';
+          let fullSessionText = '';
+          let isFinal = false;
 
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
+          // Standard W3C SpeechRecognition: event.results holds all transcript chunks for this session.
+          // Reading sequentially from index 0 to results.length - 1 extracts the exact transcript without duplicate compounding.
+          for (let i = 0; i < event.results.length; ++i) {
             const result = event.results[i];
-            const text = result[0]?.transcript || '';
-            if (result.isFinal) {
-              finalChunk += text;
+            if (result && result[0]) {
+              const text = result[0].transcript || '';
+              if (text) {
+                fullSessionText += ' ' + text;
+              }
+              if (result.isFinal) {
+                isFinal = true;
+              }
+            }
+          }
+
+          fullSessionText = fullSessionText.trim();
+          if (!fullSessionText) return;
+
+          // Handle multi-session continuation if Android or Chrome restarted after a pause
+          let rawCombined = fullSessionText;
+          if (completedHistoryRef.current) {
+            const prev = completedHistoryRef.current.trim();
+            // Prevent duplication if the new session repeats the previous text
+            if (fullSessionText.toLowerCase().startsWith(prev.toLowerCase())) {
+              rawCombined = fullSessionText;
+            } else if (prev.toLowerCase().endsWith(fullSessionText.toLowerCase())) {
+              rawCombined = prev;
             } else {
-              currentInterim += text;
+              rawCombined = `${prev} ${fullSessionText}`.trim();
             }
           }
 
-          if (finalChunk) {
-            accumulatedFinalRef.current = (accumulatedFinalRef.current + ' ' + finalChunk).trim();
+          latestSessionTextRef.current = fullSessionText;
+
+          let processed = rawCombined;
+          if (mode === 'vin') {
+            const natoParsed = parseSpokenVin(rawCombined);
+            processed = natoParsed || rawCombined.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
           }
 
-          const rawCombined = (accumulatedFinalRef.current + ' ' + currentInterim).trim();
-          if (rawCombined) {
-            let processed = rawCombined;
-            if (mode === 'vin') {
-              const natoParsed = parseSpokenVin(rawCombined);
-              processed = natoParsed || rawCombined.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
-            }
+          setTranscript(processed);
+          if (onResultRef.current) {
+            onResultRef.current(processed, isFinal);
+          }
 
-            setTranscript(processed);
-            if (onResultRef.current) {
-              onResultRef.current(processed, Boolean(finalChunk));
+          // Auto-stop in VIN mode once a complete 17-character VIN is captured
+          if (mode === 'vin' && processed.length >= 17) {
+            try {
+              recognition.stop();
+            } catch {
+              // ignore
             }
+            isListeningRef.current = false;
+            setIsListening(false);
           }
         };
 
@@ -280,14 +310,26 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
         recognition.onend = () => {
           if (isListeningRef.current) {
+            // Save current session text to completed history to maintain continuity across silent pauses
+            if (latestSessionTextRef.current) {
+              const prev = completedHistoryRef.current.trim();
+              const curr = latestSessionTextRef.current.trim();
+              if (!prev.toLowerCase().includes(curr.toLowerCase())) {
+                completedHistoryRef.current = prev ? `${prev} ${curr}` : curr;
+              }
+              latestSessionTextRef.current = '';
+            }
+
             // Auto-restart if user hasn't explicitly stopped
             try {
               recognition.start();
             } catch {
-              // ignore restart error
+              setIsListening(false);
+              isListeningRef.current = false;
             }
           } else {
             setIsListening(false);
+            isListeningRef.current = false;
           }
         };
 
@@ -308,6 +350,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const stopListening = useCallback(() => {
     isListeningRef.current = false;
     setIsListening(false);
+    completedHistoryRef.current = '';
+    latestSessionTextRef.current = '';
 
     if (recognitionRef.current) {
       try {
@@ -343,7 +387,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
   const resetTranscript = useCallback(() => {
     setTranscript('');
-    accumulatedFinalRef.current = '';
+    completedHistoryRef.current = '';
+    latestSessionTextRef.current = '';
     setErrorMessage(null);
     audioChunksRef.current = [];
   }, []);

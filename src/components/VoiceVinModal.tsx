@@ -226,25 +226,6 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
           </div>
         )}
 
-        {/* Quick Insert for Customer Truck */}
-        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2">
-          <div className="text-[11px] text-slate-300">
-            <span className="font-bold text-amber-300 block">Customer Truck Detected:</span>
-            <span className="font-mono text-xs text-white">1GTH6BEN9J1101728</span>
-            <span className="text-slate-400 text-[10px] ml-1.5">(2018 GMC Canyon)</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setParsedVin('1GTH6BEN9J1101728');
-              setErrorMessage(null);
-            }}
-            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow transition"
-          >
-            Insert VIN
-          </button>
-        </div>
-
         {/* Examples / Help */}
         <div className="p-2.5 bg-slate-950/50 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
           <span className="font-bold text-slate-300 flex items-center gap-1">
