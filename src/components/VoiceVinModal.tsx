@@ -62,6 +62,8 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     },
   });
 
+  const isLiveActive = isListening || isAiRecording;
+
   // Safe reset when modal opens or closes without auto-triggering microphone
   useEffect(() => {
     if (isOpen) {
@@ -105,7 +107,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
       document.activeElement.blur();
     }
 
-    if (isListening) {
+    if (isLiveActive) {
       stopListening();
     } else {
       startListening(parsedVin);
@@ -227,12 +229,16 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
               onClick={toggleLiveMic}
               disabled={isProcessing}
               className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
-                isListening
+                isProcessing
+                  ? 'bg-amber-500/30 text-amber-300 border-2 border-amber-400 cursor-wait'
+                  : isLiveActive
                   ? 'bg-rose-500 text-white shadow-rose-500/40 scale-105 animate-pulse'
                   : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-amber-500/20 hover:scale-105'
               }`}
             >
-              {isListening ? (
+              {isProcessing ? (
+                <Loader2 className="w-9 h-9 text-amber-300 animate-spin" />
+              ) : isLiveActive ? (
                 <Square className="w-8 h-8 text-white fill-current" />
               ) : (
                 <Mic className="w-9 h-9 text-slate-950" />
@@ -242,12 +248,16 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             <div className="text-center space-y-1">
               <span
                 className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${
-                  isListening
+                  isLiveActive
                     ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                     : 'bg-slate-800 text-slate-300 border border-slate-700'
                 }`}
               >
-                {isListening
+                {isProcessing
+                  ? 'Transcribing VIN...'
+                  : isAiRecording
+                  ? 'Recording... Speak the full VIN, then tap Stop'
+                  : isListening
                   ? parsedVin.length > 0
                     ? `Live: ${parsedVin.length}/17 Characters`
                     : 'App Mic Listening... Speak letters or NATO words'
@@ -261,7 +271,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2 pt-1">
-              {isListening ? (
+              {isLiveActive ? (
                 <button
                   type="button"
                   onClick={stopListening}
@@ -274,6 +284,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
                 <button
                   type="button"
                   onClick={() => startListening(parsedVin)}
+                  disabled={isProcessing}
                   className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 hover:border-amber-400/50 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
                 >
                   <Mic className="w-3.5 h-3.5" />
@@ -283,7 +294,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-500 flex items-center gap-1">
-              <span>Keeps listening through pauses. Stops at 17 characters, when you tap Stop, or after 10s of silence. Tap again to add more.</span>
+              <span>On phones the mic records until you tap Stop, then the VIN is transcribed. On PC it listens live until 17 characters, Stop, or 10s of silence.</span>
             </p>
           </div>
         )}
