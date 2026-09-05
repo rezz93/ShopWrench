@@ -294,7 +294,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-500 flex items-center gap-1">
-              <span>On phones the mic records until you tap Stop, then the VIN is transcribed. On PC it listens live until 17 characters, Stop, or 10s of silence.</span>
+              <span>Keeps listening through pauses (phones beep between phrases — that's normal). Stops at 17 characters, when you tap Stop, or after 10s of silence. Tap again to add more.</span>
             </p>
           </div>
         )}

@@ -287,15 +287,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       setTranscript(completedGeneralHistoryRef.current);
     }
 
-    // Mobile Chrome's Web Speech ends a session at every pause and re-emits/drops results
-    // across restarts, which mangles character-by-character VIN dictation. Record the whole
-    // utterance and let Gemini transcribe it instead.
+    // Android Chrome duplicates earlier results inside a continuous session ("1" -> "11"),
+    // so phones run one utterance per session and chain sessions in onend instead.
     const isMobileDevice = typeof navigator !== 'undefined' &&
       /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    if (mode === 'vin' && isMobileDevice) {
-      startAiRecording(confirmedVinRef.current);
-      return;
-    }
 
     const win = typeof window !== 'undefined' ? (window as unknown as IWindow) : null;
     const SpeechRecognitionAPI = win?.SpeechRecognition || win?.webkitSpeechRecognition;
@@ -312,7 +307,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         }
 
         const recognition = new SpeechRecognitionAPI();
-        recognition.continuous = continuous;
+        recognition.continuous = continuous && !isMobileDevice;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
         recognition.lang = lang;
@@ -346,34 +341,34 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let currentSessionText = '';
-          let isFinal = false;
-
-          // Sequential read across all results for this active session
-          for (let i = 0; i < event.results.length; ++i) {
-            const res = event.results[i];
-            if (res && res[0]) {
-              const chunk = res[0].transcript || '';
-              if (chunk) {
-                currentSessionText += ' ' + chunk;
-              }
-              if (res.isFinal) {
-                isFinal = true;
-              }
-            }
-          }
-
-          currentSessionText = currentSessionText.trim();
-          if (!currentSessionText) return;
-          armIdleTimer();
-
           if (mode === 'vin') {
-            // 1. Parse current burst into VIN characters using robust phonetic map
-            const burstVin = parseSpokenVin(currentSessionText);
-            latestBurstVinRef.current = burstVin;
+            // Only results from resultIndex onward changed. Finals are committed to the
+            // confirmed VIN immediately; the trailing interim text is shown as a preview
+            // and committed in onend if the session ends without a final.
+            let finalText = '';
+            let interimText = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              const res = event.results[i];
+              const chunk = res?.[0]?.transcript || '';
+              if (!chunk) continue;
+              if (res.isFinal) finalText += ' ' + chunk;
+              else interimText += ' ' + chunk;
+            }
+            finalText = finalText.trim();
+            interimText = interimText.trim();
+            if (!finalText && !interimText) return;
+            armIdleTimer();
 
-            // 2. Mathematically merge with confirmed prior history (prevents Android duplication)
-            const mergedVin = mergeVinSequences(confirmedVinRef.current, burstVin);
+            if (finalText) {
+              confirmedVinRef.current = mergeVinSequences(
+                confirmedVinRef.current,
+                parseSpokenVin(finalText)
+              );
+            }
+            latestBurstVinRef.current = interimText ? parseSpokenVin(interimText) : '';
+
+            const mergedVin = mergeVinSequences(confirmedVinRef.current, latestBurstVinRef.current);
+            const isFinal = Boolean(finalText) && !interimText;
 
             setTranscript(mergedVin);
             if (onResultRef.current) {
@@ -387,6 +382,27 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
               finishListening();
             }
           } else {
+            let currentSessionText = '';
+            let isFinal = false;
+
+            // Sequential read across all results for this active session
+            for (let i = 0; i < event.results.length; ++i) {
+              const res = event.results[i];
+              if (res && res[0]) {
+                const chunk = res[0].transcript || '';
+                if (chunk) {
+                  currentSessionText += ' ' + chunk;
+                }
+                if (res.isFinal) {
+                  isFinal = true;
+                }
+              }
+            }
+
+            currentSessionText = currentSessionText.trim();
+            if (!currentSessionText) return;
+            armIdleTimer();
+
             // General speech mode: smart deduplication across restarts
             latestGeneralBurstRef.current = currentSessionText;
             let fullText = currentSessionText;
