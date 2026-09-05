@@ -212,7 +212,7 @@ Return JSON with:
 - "confidence": "high", "medium", or "low".`;
       }
 
-      const modelsToTry = ['gemini-3.5-transcribe', 'gemini-flash-latest', 'gemini-3.8-flash'];
+      const modelsToTry = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.8-flash'];
       let response: any = null;
       let lastErr: any = null;
 
