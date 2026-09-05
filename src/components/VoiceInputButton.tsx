@@ -30,7 +30,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const [toastError, setToastError] = useState<string | null>(null);
   const targetVoiceMode: 'general' | 'vin' = voiceMode === 'vin' ? 'vin' : 'general';
 
-  const { isListening, isProcessing, isSupported, errorMessage, toggleListening } = useVoiceInput({
+  const { isListening: isLive, isAiRecording, isProcessing, isSupported, errorMessage, toggleListening } = useVoiceInput({
     mode: targetVoiceMode,
     continuous: true,
     onResult: (text, isFinal) => {
@@ -51,6 +51,8 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       setTimeout(() => setToastError(null), 5000);
     },
   });
+
+  const isListening = isLive || isAiRecording;
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -111,7 +113,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
             </span>
             <Mic className={`${iconSizes} text-white animate-bounce`} />
-            <span className="text-xs font-black tracking-wide uppercase">Listening</span>
+            <span className="text-xs font-black tracking-wide uppercase">{isAiRecording ? 'Recording' : 'Listening'}</span>
           </>
         ) : (
           <>

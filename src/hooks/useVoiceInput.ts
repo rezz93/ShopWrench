@@ -129,6 +129,11 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
           if (mode === 'vin') {
             const cleanVin = data.vin || parseSpokenVin(resultText);
             resultText = cleanVin || resultText.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
+            // A full 17-char result is authoritative; a partial one extends what was already captured
+            if (resultText.length < 17) {
+              resultText = mergeVinSequences(confirmedVinRef.current, resultText);
+            }
+            confirmedVinRef.current = resultText;
           }
           if (resultText) {
             setTranscript(resultText);
@@ -163,9 +168,15 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
   }, [mode]);
 
+  const sanitizeVinSeed = (seed?: string) =>
+    (seed || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
+
   // Start direct MediaRecorder for Gemini AI analysis
-  const startAiRecording = useCallback(async () => {
+  const startAiRecording = useCallback(async (seed?: string) => {
     if (isAiRecordingRef.current) return;
+    if (mode === 'vin') {
+      confirmedVinRef.current = sanitizeVinSeed(typeof seed === 'string' ? seed : '');
+    }
     if (!navigator?.mediaDevices?.getUserMedia) {
       const msg = 'Microphone access is not supported in this browser.';
       setErrorMessage(msg);
@@ -234,7 +245,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       isAiRecordingRef.current = false;
       setIsAiRecording(false);
     }
-  }, [stopMediaStream, transcribeAudioWithAi]);
+  }, [mode, stopMediaStream, transcribeAudioWithAi]);
 
   const stopAiRecording = useCallback(() => {
     isAiRecordingRef.current = false;
@@ -253,7 +264,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   // Live SpeechRecognition. Recognition sessions are chained across pauses until the
   // user stops, the VIN reaches 17 characters, or IDLE_TIMEOUT_MS passes with no speech.
   const startListening = useCallback(async (seed?: string) => {
-    if (isListeningRef.current) return;
+    if (isListeningRef.current || isAiRecordingRef.current) return;
 
     // 1. Immediately dismiss any open virtual keyboard on phone to prevent keyboard mic conflict
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
@@ -269,11 +280,21 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     latestGeneralBurstRef.current = '';
     audioChunksRef.current = [];
     if (mode === 'vin') {
-      confirmedVinRef.current = (seed || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
+      confirmedVinRef.current = sanitizeVinSeed(seed);
       setTranscript(confirmedVinRef.current);
     } else {
       completedGeneralHistoryRef.current = seed || '';
       setTranscript(completedGeneralHistoryRef.current);
+    }
+
+    // Mobile Chrome's Web Speech ends a session at every pause and re-emits/drops results
+    // across restarts, which mangles character-by-character VIN dictation. Record the whole
+    // utterance and let Gemini transcribe it instead.
+    const isMobileDevice = typeof navigator !== 'undefined' &&
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (mode === 'vin' && isMobileDevice) {
+      startAiRecording(confirmedVinRef.current);
+      return;
     }
 
     const win = typeof window !== 'undefined' ? (window as unknown as IWindow) : null;
@@ -396,7 +417,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
             // Fall back to AI audio recording
             console.info('Switching to MediaRecorder audio recording');
             clearIdleTimer();
-            startAiRecording();
+            startAiRecording(confirmedVinRef.current);
             return;
           }
         };
@@ -462,7 +483,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
 
     // Fallback: Launch AI audio recording
-    startAiRecording();
+    startAiRecording(confirmedVinRef.current);
   }, [clearIdleTimer, continuous, lang, mode, startAiRecording]);
 
   const stopListening = useCallback(() => {
@@ -494,7 +515,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   }, [clearIdleTimer, mode, stopAiRecording]);
 
   const toggleListening = useCallback(() => {
-    if (isListeningRef.current) {
+    if (isListeningRef.current || isAiRecordingRef.current) {
       stopListening();
     } else {
       startListening();
