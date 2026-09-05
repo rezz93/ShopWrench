@@ -32,16 +32,11 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     mode: 'vin',
     onResult: (transcript, isFinal) => {
       setSpokenText(transcript);
-      // Try NATO phonetic parser first
-      const natoResult = parseSpokenVin(transcript);
-      if (natoResult && natoResult.length >= 8) {
-        setParsedVin(natoResult);
-      } else {
-        // Direct alphanumeric cleanup
-        const clean = transcript.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        if (clean.length > 0) {
-          setParsedVin(clean.slice(0, 17));
-        }
+      // Real-time parsing of NATO words and alphanumeric characters for any length (1 to 17)
+      const clean = parseSpokenVin(transcript) || transcript.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
+      if (clean) {
+        setParsedVin(clean);
+        setErrorMessage(null);
       }
     },
     onError: (err) => {
@@ -141,7 +136,9 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
               {isProcessing
                 ? 'Transcribing with Gemini AI...'
                 : isListening
-                ? 'Recording... Tap to Finish'
+                ? parsedVin.length > 0
+                  ? `Listening... ${parsedVin.length}/17 Captured`
+                  : 'Listening... Speak characters or NATO words'
                 : 'Tap to Start Speaking'}
             </span>
             {spokenText && (
@@ -160,7 +157,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
               >
                 <Square className="w-3.5 h-3.5 fill-current" />
-                <span>Stop &amp; Transcribe</span>
+                <span>Done Speaking</span>
               </button>
             ) : (
               <button

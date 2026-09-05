@@ -198,7 +198,7 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* 17-Digit VIN Input */}
+            {/* 17-Digit VIN Input with Direct Voice Dictation */}
             <div className="relative flex-1">
               <input
                 id="vin-input-field"
@@ -216,19 +216,35 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                     handleDecode();
                   }
                 }}
-                className="w-full min-h-[54px] px-4 pl-11 text-base sm:text-lg font-mono font-bold tracking-wider text-white bg-slate-950 border-2 border-slate-700 rounded-xl focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 placeholder:text-slate-600 transition"
+                className="w-full min-h-[54px] px-4 pl-11 pr-28 text-base sm:text-lg font-mono font-bold tracking-wider text-white bg-slate-950 border-2 border-slate-700 rounded-xl focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 placeholder:text-slate-600 transition"
               />
               <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              {vinInput && (
-                <button
-                  type="button"
-                  onClick={() => setVinInput('')}
-                  aria-label="Clear VIN"
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2 py-1 rounded"
-                >
-                  CLEAR
-                </button>
-              )}
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                {vinInput && (
+                  <button
+                    type="button"
+                    onClick={() => setVinInput('')}
+                    aria-label="Clear VIN"
+                    className="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2 py-1 rounded cursor-pointer transition"
+                  >
+                    CLEAR
+                  </button>
+                )}
+                <VoiceInputButton
+                  id="voice-vin-direct-inline-btn"
+                  size="sm"
+                  mode="replace"
+                  voiceMode="vin"
+                  onTranscript={(text) => {
+                    const clean = parseSpokenVin(text) || text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
+                    if (clean) {
+                      setVinInput(clean);
+                      if (errorMsg) setErrorMsg(null);
+                    }
+                  }}
+                  title="Speak VIN directly into this field (NATO words or digits supported)"
+                />
+              </div>
             </div>
 
             {/* Action Buttons: Decode & Scan */}

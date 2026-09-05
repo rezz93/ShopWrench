@@ -7,12 +7,14 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.6',
+  version: '1.4.7',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v1',
+  build: 'rev-2026.09.05-v2',
   changes: [
+    'Real-time Live VIN Dictation: Direct inline microphone button in VIN input field streams characters as spoken',
+    'Fixed Web Speech audio pipeline conflict by decoupling getUserMedia lock from speech recognition stream',
+    'Real-time NATO phonetic & digit parsing for any length (1-17 characters) with instant UI synchronization',
     'Hybrid Voice Recognition: Gemini AI multimodal audio transcription failover for Android, Chrome, and desktop PWA',
-    'Resolved browser Web Speech permission and network blocks with native hardware MediaRecorder streaming',
     'Dedicated Automotive Voice VIN mode with ISO 3779 17-character validation and NATO phonetic alphabet conversion',
     'Quick-insert shortcut for customer 2018 GMC Canyon (1GTH6BEN9J1101728) in voice and preset selectors',
     'Dashboard VIN Plate OCR: 2-tier Gemini AI Vision + hardened client Tesseract OCR pipeline',

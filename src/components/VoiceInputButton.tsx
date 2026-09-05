@@ -6,6 +6,7 @@ export interface VoiceInputButtonProps {
   id?: string;
   onTranscript: (transcript: string) => void;
   mode?: 'append' | 'replace';
+  voiceMode?: 'general' | 'vin';
   currentValue?: string;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
@@ -18,6 +19,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   id,
   onTranscript,
   mode = 'append',
+  voiceMode = 'general',
   currentValue = '',
   className = '',
   size = 'md',
@@ -26,12 +28,15 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   label = 'Dictate',
 }) => {
   const [toastError, setToastError] = useState<string | null>(null);
+  const targetVoiceMode: 'general' | 'vin' = voiceMode === 'vin' ? 'vin' : 'general';
 
   const { isListening, isProcessing, isSupported, errorMessage, toggleListening } = useVoiceInput({
-    mode: 'general',
+    mode: targetVoiceMode,
+    continuous: true,
     onResult: (text, isFinal) => {
       if (!text) return;
-      if (mode === 'replace') {
+      if (mode === 'replace' || voiceMode === 'vin') {
+        // Stream text immediately as spoken
         onTranscript(text);
       } else {
         // Append mode
