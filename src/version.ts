@@ -7,10 +7,11 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.9',
+  version: '1.4.10',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v4',
+  build: 'rev-2026.09.05-v5',
   changes: [
+    'Resolved Cloud Run / Publish startup failure by adding server.ts esbuild bundling to production build script (generates dist/server.cjs)',
     'Single-Operator Zero-Login Live Cloud Sync: Jobs, parts, and VIN records sync in real-time between Phone & PC via Firestore shop_jobs without login friction',
     'Streamlined Cloud Sync Modal into a zero-barrier Device & URL manager with 1-click copy link and home screen installation guidance',
     'Fixed Android Chrome repeated speech-to-text bug (e.g. 1gth1gth...) by reading session transcripts directly from Web Speech results instead of accumulating interim frames',
