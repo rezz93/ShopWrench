@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, AlertCircle, CheckCircle2, RotateCcw, Check, Sparkles, X, Volume2 } from 'lucide-react';
+import { Mic, MicOff, AlertCircle, RotateCcw, Check, X, Volume2, Loader2, Play, Square } from 'lucide-react';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 import { parseSpokenVin } from '../utils/natoPhonetic';
 
@@ -20,13 +20,28 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
   const [parsedVin, setParsedVin] = useState(initialVin);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { isListening, isSupported, startListening, stopListening, toggleListening } = useVoiceInput({
+  const {
+    isListening,
+    isProcessing,
+    isSupported,
+    startListening,
+    stopListening,
+    toggleListening,
+  } = useVoiceInput({
     continuous: true,
-    onResult: (transcript) => {
+    mode: 'vin',
+    onResult: (transcript, isFinal) => {
       setSpokenText(transcript);
-      const converted = parseSpokenVin(transcript);
-      if (converted) {
-        setParsedVin(converted);
+      // Try NATO phonetic parser first
+      const natoResult = parseSpokenVin(transcript);
+      if (natoResult && natoResult.length >= 8) {
+        setParsedVin(natoResult);
+      } else {
+        // Direct alphanumeric cleanup
+        const clean = transcript.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (clean.length > 0) {
+          setParsedVin(clean.slice(0, 17));
+        }
       }
     },
     onError: (err) => {
@@ -34,19 +49,16 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     },
   });
 
-  // Auto-start microphone when opened
+  // Safe reset when modal opens or closes without auto-triggering microphone
   useEffect(() => {
     if (isOpen) {
       setSpokenText('');
       setParsedVin(initialVin);
       setErrorMessage(null);
-      if (isSupported) {
-        startListening();
-      }
     } else {
       stopListening();
     }
-  }, [isOpen, initialVin, isSupported, startListening, stopListening]);
+  }, [isOpen, initialVin, stopListening]);
 
   if (!isOpen) return null;
 
@@ -62,7 +74,6 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
     setSpokenText('');
     setParsedVin('');
     setErrorMessage(null);
-    startListening();
   };
 
   return (
@@ -70,7 +81,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
       id="voice-vin-modal"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-5 sm:p-6 space-y-5">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-5 sm:p-6 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -82,7 +93,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
                 Voice VIN Dictation
               </h3>
               <p className="text-xs text-slate-400">
-                Speak digits, letters, or NATO phonetics (e.g. &quot;Alpha One Charlie&quot;)
+                Speak letters, numbers, or NATO words (e.g. &quot;One Golf Tango Hotel...&quot;)
               </p>
             </div>
           </div>
@@ -95,32 +106,43 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
         </div>
 
         {/* Live Mic Animation & Status */}
-        <div className="flex flex-col items-center justify-center py-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+        <div className="flex flex-col items-center justify-center py-5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
           <button
             type="button"
             onClick={toggleListening}
-            className={`w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
-              isListening
-                ? 'bg-rose-500 text-white shadow-rose-500/30 scale-105 animate-pulse'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-2 border-slate-600'
+            disabled={isProcessing}
+            className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
+              isProcessing
+                ? 'bg-amber-500/20 text-amber-300 border-2 border-amber-400 cursor-wait'
+                : isListening
+                ? 'bg-rose-500 text-white shadow-rose-500/40 scale-105 animate-pulse'
+                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-amber-500/20 hover:scale-105'
             }`}
           >
-            {isListening ? (
-              <Mic className="w-9 h-9 text-white animate-bounce" />
+            {isProcessing ? (
+              <Loader2 className="w-9 h-9 text-amber-400 animate-spin" />
+            ) : isListening ? (
+              <Square className="w-8 h-8 text-white fill-current" />
             ) : (
-              <MicOff className="w-9 h-9 text-slate-400" />
+              <Mic className="w-9 h-9 text-slate-950" />
             )}
           </button>
 
           <div className="text-center space-y-1">
             <span
               className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${
-                isListening
+                isProcessing
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : isListening
                   ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                  : 'bg-slate-800 text-slate-400'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700'
               }`}
             >
-              {isListening ? 'Listening to speech...' : 'Microphone Paused (Tap to Speak)'}
+              {isProcessing
+                ? 'Transcribing with Gemini AI...'
+                : isListening
+                ? 'Recording... Tap to Finish'
+                : 'Tap to Start Speaking'}
             </span>
             {spokenText && (
               <p className="text-xs text-slate-400 italic max-w-sm px-4 truncate">
@@ -128,10 +150,34 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
               </p>
             )}
           </div>
+
+          {/* Explicit Start/Stop controls */}
+          <div className="flex items-center gap-2 pt-1">
+            {isListening ? (
+              <button
+                type="button"
+                onClick={stopListening}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
+              >
+                <Square className="w-3.5 h-3.5 fill-current" />
+                <span>Stop &amp; Transcribe</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startListening}
+                disabled={isProcessing}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 hover:border-amber-400/50 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Start Microphone</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Decoded VIN Display */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-300">
             <span>Recognized VIN:</span>
             <span className={`font-mono ${parsedVin.length === 17 ? 'text-emerald-400 font-black' : 'text-amber-400'}`}>
@@ -160,20 +206,24 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
           <div className="p-3.5 bg-rose-950/70 border border-rose-800 rounded-2xl space-y-2 text-rose-200 text-xs">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-bold text-rose-300">Voice Recognition / Permission Error</p>
+              <div className="space-y-1 flex-1">
+                <p className="font-bold text-rose-300">Microphone Notice</p>
                 <p className="text-rose-200/90 leading-relaxed">{errorMessage}</p>
               </div>
+              <button
+                type="button"
+                onClick={() => setErrorMessage(null)}
+                className="text-rose-400 hover:text-white text-xs font-bold"
+              >
+                ✕
+              </button>
             </div>
 
             {/* Android PWA / Chrome Permissions Explanation */}
             <div className="pt-2 border-t border-rose-900/60 text-[11px] text-rose-200/80 space-y-1">
-              <p className="font-semibold text-rose-300">Why does phone settings show "No permissions"?</p>
+              <p className="font-semibold text-rose-300">Microphone Setup in Chrome:</p>
               <p className="leading-relaxed">
-                Installed web apps on Android inherit permissions from <strong>Google Chrome</strong>, not phone system settings.
-              </p>
-              <p className="leading-relaxed">
-                <strong>To enable:</strong> In Chrome, tap the 🔒 or ⚙ icon in the address bar (or Chrome Menu → Settings → Site settings → Microphone) and tap <strong>Allow</strong>.
+                In Chrome address bar, tap the <strong>tune/lock icon (⚙ / 🔒)</strong> → <strong>Permissions</strong> → Set <strong>Microphone</strong> to <strong>Allow</strong>.
               </p>
             </div>
           </div>
@@ -199,13 +249,13 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
         </div>
 
         {/* Examples / Help */}
-        <div className="p-3 bg-slate-950/50 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+        <div className="p-2.5 bg-slate-950/50 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
           <span className="font-bold text-slate-300 flex items-center gap-1">
             <Volume2 className="w-3.5 h-3.5 text-amber-400" />
             Tips for accurate speech recognition:
           </span>
           <p className="text-slate-400 leading-relaxed">
-            • Speak clearly: <span className="text-amber-300 font-mono">1 G T H 6 B E N 9 J...</span>
+            • Speak digits/letters: <span className="text-amber-300 font-mono">1 G T H 6 B E N 9 J...</span>
             <br />
             • Or NATO words: <span className="text-amber-300">One Golf Tango Hotel Six Bravo...</span>
           </p>

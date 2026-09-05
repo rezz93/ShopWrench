@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Search,
   Camera,
+  Mic,
   CheckCircle2,
   AlertCircle,
   Car,
@@ -261,6 +262,17 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
               >
                 <Camera className="w-5 h-5 text-amber-400" />
                 <span className="whitespace-nowrap">Camera Scan / OCR</span>
+              </button>
+
+              <button
+                id="open-voice-vin-btn"
+                type="button"
+                onClick={() => setIsVoiceModalOpen(true)}
+                className="flex-1 sm:flex-initial min-h-[54px] px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-bold text-base border-2 border-slate-600 hover:border-amber-400/60 flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                title="Dictate VIN with voice or spell with NATO phonetics"
+              >
+                <Mic className="w-5 h-5 text-amber-400" />
+                <span className="whitespace-nowrap">Voice VIN</span>
               </button>
             </div>
           </div>

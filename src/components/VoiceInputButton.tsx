@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mic, MicOff, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, AlertCircle, Loader2 } from 'lucide-react';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 
 export interface VoiceInputButtonProps {
@@ -27,7 +27,8 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
 }) => {
   const [toastError, setToastError] = useState<string | null>(null);
 
-  const { isListening, isSupported, errorMessage, toggleListening } = useVoiceInput({
+  const { isListening, isProcessing, isSupported, errorMessage, toggleListening } = useVoiceInput({
+    mode: 'general',
     onResult: (text, isFinal) => {
       if (!text) return;
       if (mode === 'replace') {
@@ -42,7 +43,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     },
     onError: (err) => {
       setToastError(err);
-      setTimeout(() => setToastError(null), 4000);
+      setTimeout(() => setToastError(null), 5000);
     },
   });
 
@@ -50,8 +51,8 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     e.preventDefault();
     e.stopPropagation();
     if (!isSupported) {
-      setToastError('Speech recognition is not supported in this browser. Try Chrome, Edge, or Safari.');
-      setTimeout(() => setToastError(null), 4000);
+      setToastError('Microphone not supported or blocked in this browser.');
+      setTimeout(() => setToastError(null), 5000);
       return;
     }
     toggleListening();
@@ -75,15 +76,23 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         type="button"
         id={id || 'voice-input-btn'}
         onClick={handleClick}
-        title={isListening ? 'Listening... Tap to stop voice dictation' : title}
+        disabled={isProcessing}
+        title={isProcessing ? 'Transcribing with Gemini AI...' : isListening ? 'Listening... Tap to stop' : title}
         aria-label={isListening ? 'Stop voice recording' : 'Start voice dictation'}
         className={`relative rounded-xl font-bold flex items-center justify-center gap-1.5 transition cursor-pointer select-none ${
-          isListening
+          isProcessing
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-wait'
+            : isListening
             ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30 border border-rose-400 animate-pulse'
             : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 active:bg-slate-900'
         } ${sizeClasses} ${className}`}
       >
-        {isListening ? (
+        {isProcessing ? (
+          <>
+            <Loader2 className={`${iconSizes} text-amber-400 animate-spin`} />
+            <span className="text-xs font-bold text-amber-300">Processing...</span>
+          </>
+        ) : isListening ? (
           <>
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-200 opacity-75"></span>
@@ -101,19 +110,19 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       </button>
 
       {/* Floating error notification */}
-      {(toastError || errorMessage) && (
+      {(toastError || errorMessage) && !isListening && (
         <div
           role="alert"
-          className="absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-64 p-2.5 bg-rose-950 border border-rose-500/60 text-rose-200 text-xs rounded-xl shadow-xl flex items-start gap-2"
+          className="absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-72 p-3 bg-rose-950/95 border border-rose-500/60 text-rose-200 text-xs rounded-xl shadow-xl flex items-start gap-2 backdrop-blur-sm"
         >
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-semibold">{toastError || errorMessage}</p>
+            <p className="font-semibold text-rose-200 leading-tight">{toastError || errorMessage}</p>
           </div>
           <button
             type="button"
             onClick={() => setToastError(null)}
-            className="text-rose-400 hover:text-white text-xs font-bold"
+            className="text-rose-400 hover:text-white text-xs font-bold p-1 cursor-pointer"
           >
             ✕
           </button>

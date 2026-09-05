@@ -7,10 +7,14 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.5',
-  releaseDate: '2026-09-03',
-  build: 'rev-2026.09.03-p7',
+  version: '1.4.6',
+  releaseDate: '2026-09-05',
+  build: 'rev-2026.09.05-v1',
   changes: [
+    'Hybrid Voice Recognition: Gemini AI multimodal audio transcription failover for Android, Chrome, and desktop PWA',
+    'Resolved browser Web Speech permission and network blocks with native hardware MediaRecorder streaming',
+    'Dedicated Automotive Voice VIN mode with ISO 3779 17-character validation and NATO phonetic alphabet conversion',
+    'Quick-insert shortcut for customer 2018 GMC Canyon (1GTH6BEN9J1101728) in voice and preset selectors',
     'Dashboard VIN Plate OCR: 2-tier Gemini AI Vision + hardened client Tesseract OCR pipeline',
     'ISO 3779 / NHTSA 9th digit checksum verification with real-time badge and safeguard confirmation',
     'Automotive 2D DataMatrix barcode preamble normalization ([)>06, 17V stripping)',

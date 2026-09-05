@@ -166,6 +166,162 @@ CRITICAL INSTRUCTIONS FOR DASHBOARD WINDSHIELD PLATES:
     }
   });
 
+  // Multimodal Gemini Audio Transcription Endpoint (Universal Voice Dictation & VIN Extraction)
+  app.post('/api/transcribe-audio', async (req, res) => {
+    try {
+      const { audioBase64, mimeType = 'audio/webm', mode = 'general' } = req.body;
+
+      if (!audioBase64) {
+        return res.status(400).json({ error: 'Missing audioBase64 payload in request body.' });
+      }
+
+      // Strip data URL header if present (e.g. data:audio/webm;codecs=opus;base64,...)
+      const cleanBase64 = audioBase64.replace(/^data:audio\/[a-zA-Z0-9.+_-]+;base64,/, '');
+
+      // Normalize mimeType for Gemini: Gemini supports audio/webm, audio/mp4, audio/wav, audio/ogg, audio/mpeg, etc.
+      let normalizedMime = mimeType.split(';')[0].trim();
+      if (!normalizedMime || !normalizedMime.startsWith('audio/')) {
+        normalizedMime = 'audio/webm';
+      }
+
+      const ai = getGeminiClient();
+
+      let prompt = '';
+      if (mode === 'vin') {
+        prompt = `You are an expert automotive VIN voice transcription specialist for an auto repair shop.
+The audio is a mechanic, technician, or driver speaking an automotive 17-character Vehicle Identification Number (VIN).
+They may speak:
+- Alphanumeric characters sequentially (e.g., "1 G T H 6 B E N 9 J 1 1 0 1 7 2 8")
+- NATO phonetic alphabet (e.g. "One Golf Tango Hotel Six Bravo Echo November Nine Juliet...")
+- Numbers as digits (e.g., "One" -> 1, "Zero" -> 0, "Six" -> 6)
+CRITICAL VIN RULES:
+1. Valid VINs are exactly 17 characters long.
+2. Letters I, O, and Q are NEVER used in any VIN. If you hear "I" or "eye", it is digit 1. If you hear "O" or "oh", it is digit 0.
+3. Positions 12 through 17 are always numeric serial digits on North American vehicles (e.g., 1101728).
+4. Return the clean 17-character uppercase alphanumeric VIN without spaces or dashes.
+Return JSON with:
+- "vin": the extracted 17-character VIN in uppercase, or best partial sequence.
+- "transcript": the raw words spoken by the user.
+- "confidence": "high", "medium", or "low".`;
+      } else {
+        prompt = `You are an expert automotive voice dictation assistant.
+Transcribe the user's spoken voice audio verbatim.
+The dictation may include automotive terminology, mechanic inspection notes, customer repair complaints, part names, or diagnostic trouble codes (such as OBD-II codes P0300, P0420).
+Return JSON with:
+- "transcript": The clean, correctly punctuated, capitalized English transcript of what was spoken.
+- "confidence": "high", "medium", or "low".`;
+      }
+
+      const modelsToTry = ['gemini-3.5-transcribe', 'gemini-flash-latest', 'gemini-3.8-flash'];
+      let response: any = null;
+      let lastErr: any = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: normalizedMime,
+                      data: cleanBase64,
+                    },
+                  },
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: mode === 'vin' ? {
+                type: Type.OBJECT,
+                properties: {
+                  vin: {
+                    type: Type.STRING,
+                    description: 'The extracted 17-character VIN in uppercase',
+                  },
+                  transcript: {
+                    type: Type.STRING,
+                    description: 'The verbatim transcript of spoken audio',
+                  },
+                  confidence: {
+                    type: Type.STRING,
+                    description: 'high, medium, or low',
+                  },
+                },
+                required: ['transcript', 'confidence'],
+              } : {
+                type: Type.OBJECT,
+                properties: {
+                  transcript: {
+                    type: Type.STRING,
+                    description: 'The verbatim transcript of spoken audio',
+                  },
+                  confidence: {
+                    type: Type.STRING,
+                    description: 'high, medium, or low',
+                  },
+                },
+                required: ['transcript', 'confidence'],
+              },
+            },
+          });
+          if (response?.text) {
+            break;
+          }
+        } catch (mErr: any) {
+          lastErr = mErr;
+          console.warn(`Model ${modelName} failed for voice audio transcription:`, mErr?.message || mErr);
+        }
+      }
+
+      if (!response?.text) {
+        throw lastErr || new Error('All AI transcription models were temporarily unavailable.');
+      }
+
+      let text = response.text.trim();
+      if (text.startsWith('```')) {
+        text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+      }
+
+      let result: any = {};
+      try {
+        result = JSON.parse(text);
+      } catch {
+        result = {
+          transcript: text,
+          vin: text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17),
+          confidence: 'medium',
+        };
+      }
+
+      if (result.vin) {
+        result.vin = result.vin.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (result.vin.length > 17) {
+          const match17 = result.vin.match(/([A-HJ-NPR-Z0-9]{17})/);
+          if (match17) result.vin = match17[1];
+        }
+      }
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (err: unknown) {
+      console.error('Audio transcription error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown audio transcription error';
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
+    }
+  });
+
   // Vite middleware in dev, static files in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
