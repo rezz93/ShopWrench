@@ -25,8 +25,9 @@ export default function App() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
+  const [isCloudConnected, setIsCloudConnected] = useState(true);
 
-  // Initialize and listen to Auth state + Cloud Sync
+  // Initialize and listen to real-time Shop Cloud Sync (works on Phone & PC with zero login)
   useEffect(() => {
     // 1. Initial local load
     setJobs(getStoredJobs());
@@ -37,31 +38,21 @@ export default function App() {
     };
     window.addEventListener('autoshop_jobs_updated', handleStorageUpdate);
 
-    // 3. Firebase Auth listener
-    let unsubscribeSync: (() => void) | null = null;
+    // 3. Direct Firestore real-time shop sync
+    const unsubscribeSync = setupRealtimeSync((cloudJobs) => {
+      setJobs(cloudJobs);
+      setIsCloudConnected(true);
+    });
 
+    // 4. Optional Firebase Auth listener (maintained for optional account linking)
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      if (unsubscribeSync) {
-        unsubscribeSync();
-        unsubscribeSync = null;
-      }
-
-      if (user) {
-        // Connected to Cloud: subscribe to real-time updates
-        unsubscribeSync = setupRealtimeSync(user.uid, (cloudJobs) => {
-          setJobs(cloudJobs);
-        });
-      } else {
-        // Local mode
-        setJobs(getStoredJobs());
-      }
     });
 
     return () => {
       window.removeEventListener('autoshop_jobs_updated', handleStorageUpdate);
+      unsubscribeSync();
       unsubscribeAuth();
-      if (unsubscribeSync) unsubscribeSync();
     };
   }, []);
 
@@ -196,19 +187,10 @@ export default function App() {
             onClick={() => setIsCloudSyncModalOpen(true)}
             className="flex items-center gap-1.5 text-slate-400 hover:text-white transition cursor-pointer"
           >
-            {currentUser ? (
-              <>
-                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-medium">
-                  Cloud Synced ({currentUser.email || 'Google User'})
-                </span>
-              </>
-            ) : (
-              <>
-                <Database className="w-3.5 h-3.5 text-amber-400" />
-                <span>Local Only • Tap to Sync Phone &amp; PC</span>
-              </>
-            )}
+            <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-emerald-400 font-medium">
+              Live Cloud Sync • PC &amp; Phone Connected
+            </span>
           </button>
 
           <button

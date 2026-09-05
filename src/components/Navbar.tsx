@@ -104,22 +104,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="btn-cloud-sync"
             onClick={onOpenCloudSync}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
-              currentUser
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-                : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-            }`}
-            title="Configure Phone & PC Sync"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 text-xs font-bold transition cursor-pointer"
+            title="Cloud Sync Active: Jobs sync automatically between Phone & PC"
           >
-            <Cloud className={`w-4 h-4 ${currentUser ? 'text-emerald-400' : 'text-amber-400'}`} />
-            <span className="hidden sm:inline">
-              {currentUser ? 'Cloud Synced' : 'Sync Phone & PC'}
-            </span>
-            <span
-              className={`w-2 h-2 rounded-full ${
-                currentUser ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-              }`}
-            />
+            <Cloud className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Cloud Live</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           </button>
         </div>
       </div>

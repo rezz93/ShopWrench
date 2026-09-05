@@ -1,5 +1,18 @@
 {
   "entities": {
+    "ShopJob": {
+      "collection": "shop_jobs",
+      "fields": {
+        "customer_name": { "type": "string", "description": "Customer name" },
+        "vin": { "type": "string", "description": "17-character VIN" },
+        "status": { "type": "string", "description": "Job status: In Progress, Waiting on Parts, Completed" },
+        "vehicle_details": { "type": "map", "description": "Vehicle specs decoded from NHTSA" },
+        "parts_list": { "type": "list", "description": "Parts list and their statuses" },
+        "service_notes": { "type": "string", "description": "Technician diagnosis and notes" },
+        "created_at": { "type": "string", "description": "ISO creation timestamp" },
+        "updated_at": { "type": "string", "description": "ISO last updated timestamp" }
+      }
+    },
     "Job": {
       "collection": "jobs",
       "fields": {

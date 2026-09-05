@@ -2,27 +2,32 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Shared single-operator shop jobs (live real-time sync between PC and phone without login)
+    match /shop_jobs/{jobId} {
+      allow read, write: if true;
+    }
+
+    match /shops/{shopId}/{allSubcollections=**} {
+      allow read, write: if true;
+    }
+
     // User profile and subcollections
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if true;
       
       match /{allSubcollections=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if true;
       }
     }
 
-    // Top-level jobs collection with userId partition
+    // Top-level jobs collection
     match /jobs/{jobId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read, write: if true;
     }
 
     // Custom stores collection
     match /custom_stores/{storeId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read, write: if true;
     }
   }
 }

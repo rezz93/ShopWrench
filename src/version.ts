@@ -7,10 +7,12 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.8',
+  version: '1.4.9',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v3',
+  build: 'rev-2026.09.05-v4',
   changes: [
+    'Single-Operator Zero-Login Live Cloud Sync: Jobs, parts, and VIN records sync in real-time between Phone & PC via Firestore shop_jobs without login friction',
+    'Streamlined Cloud Sync Modal into a zero-barrier Device & URL manager with 1-click copy link and home screen installation guidance',
     'Fixed Android Chrome repeated speech-to-text bug (e.g. 1gth1gth...) by reading session transcripts directly from Web Speech results instead of accumulating interim frames',
     'Removed Customer Truck Detected shortcut option from Voice VIN modal as requested',
     'Auto-stop on VIN complete: microphone automatically finishes once all 17 valid characters are captured',

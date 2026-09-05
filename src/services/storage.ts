@@ -157,39 +157,43 @@ export function saveJobs(jobs: Job[], skipCloud = false): void {
   }
 }
 
-// Write a single job to Firestore if user is authenticated
+// Write a single job to Firestore (shared shop ledger for seamless PC & Phone sync)
 async function syncJobToFirestore(job: Job): Promise<void> {
-  const user = auth.currentUser;
-  if (!user) return;
   try {
-    // Ensure parent user document exists with metadata
-    const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      uid: user.uid,
-      email: user.email || '',
-      lastSync: new Date().toISOString(),
-    }, { merge: true });
-
-    const jobRef = doc(db, 'users', user.uid, 'jobs', job.id);
+    const jobRef = doc(db, 'shop_jobs', job.id);
     await setDoc(jobRef, {
       ...job,
-      userId: user.uid,
       syncedAt: new Date().toISOString(),
     }, { merge: true });
+
+    // Also mirror to authenticated user path if user is signed in
+    const user = auth.currentUser;
+    if (user) {
+      const userJobRef = doc(db, 'users', user.uid, 'jobs', job.id);
+      await setDoc(userJobRef, {
+        ...job,
+        userId: user.uid,
+        syncedAt: new Date().toISOString(),
+      }, { merge: true });
+    }
   } catch (err) {
-    console.error('Error syncing job to Firestore:', err);
+    console.error('Error syncing job to Firestore shop_jobs:', err);
   }
 }
 
-// Delete a single job from Firestore if user is authenticated
+// Delete a single job from Firestore
 async function deleteJobFromFirestore(jobId: string): Promise<void> {
-  const user = auth.currentUser;
-  if (!user) return;
   try {
-    const jobRef = doc(db, 'users', user.uid, 'jobs', jobId);
+    const jobRef = doc(db, 'shop_jobs', jobId);
     await deleteDoc(jobRef);
+
+    const user = auth.currentUser;
+    if (user) {
+      const userJobRef = doc(db, 'users', user.uid, 'jobs', jobId);
+      await deleteDoc(userJobRef);
+    }
   } catch (err) {
-    console.error('Error deleting job from Firestore:', err);
+    console.error('Error deleting job from Firestore shop_jobs:', err);
   }
 }
 
@@ -332,56 +336,75 @@ export function cyclePartStatus(currentStatus: PartStatus): PartStatus {
   return 'Needed';
 }
 
-// Upload all local jobs to the user's cloud account when they sign in
-export async function uploadLocalJobsToCloud(userId: string): Promise<number> {
+// Upload all local jobs to Firestore (shop_jobs collection)
+export async function uploadLocalJobsToCloud(userId?: string): Promise<number> {
   const localJobs = getStoredJobs();
-  const user = auth.currentUser;
-
-  // Create or update parent user document
-  try {
-    const userRef = doc(db, 'users', userId);
-    await setDoc(userRef, {
-      uid: userId,
-      email: user?.email || '',
-      lastSync: new Date().toISOString(),
-      jobCount: localJobs.length,
-    }, { merge: true });
-  } catch (err) {
-    console.error('Failed to create parent user doc:', err);
-  }
-
   if (localJobs.length === 0) return 0;
 
   let count = 0;
   for (const job of localJobs) {
     try {
-      const jobRef = doc(db, 'users', userId, 'jobs', job.id);
+      const jobRef = doc(db, 'shop_jobs', job.id);
       await setDoc(jobRef, {
         ...job,
-        userId,
         syncedAt: new Date().toISOString(),
       }, { merge: true });
+
+      if (userId) {
+        const userJobRef = doc(db, 'users', userId, 'jobs', job.id);
+        await setDoc(userJobRef, {
+          ...job,
+          userId,
+          syncedAt: new Date().toISOString(),
+        }, { merge: true });
+      }
       count++;
     } catch (e) {
-      console.error(`Failed to migrate job ${job.id} to cloud:`, e);
+      console.error(`Failed to sync job ${job.id} to cloud:`, e);
     }
   }
   return count;
 }
 
-// Set up real-time listener for Firestore jobs
+// Force an immediate fetch from Firestore shop_jobs
+export async function fetchCloudJobs(): Promise<Job[]> {
+  try {
+    const snap = await getDocs(collection(db, 'shop_jobs'));
+    const cloudJobs: Job[] = [];
+    snap.forEach((docSnap) => {
+      cloudJobs.push(docSnap.data() as Job);
+    });
+    if (cloudJobs.length > 0) {
+      cloudJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      cachedJobs = cloudJobs;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudJobs));
+      window.dispatchEvent(new Event('autoshop_jobs_updated'));
+      return cloudJobs;
+    }
+    return getStoredJobs();
+  } catch (err) {
+    console.error('Failed to fetch jobs from shop_jobs:', err);
+    return getStoredJobs();
+  }
+}
+
+// Set up real-time listener for Firestore jobs (works without login across PC & phone)
 export function setupRealtimeSync(
-  userId: string,
-  onUpdate: (cloudJobs: Job[]) => void
+  onUpdate: (cloudJobs: Job[]) => void,
+  userId?: string
 ): () => void {
-  const jobsCol = collection(db, 'users', userId, 'jobs');
+  // Listen directly to the shared shop collection
+  const jobsCol = collection(db, 'shop_jobs');
 
   const unsubscribe = onSnapshot(
     jobsCol,
     (snapshot) => {
-      if (snapshot.empty && getStoredJobs().length > 0) {
-        // First time cloud user with existing local jobs: seed cloud with local jobs
-        uploadLocalJobsToCloud(userId);
+      if (snapshot.empty) {
+        // First time initialization: upload current local jobs so they populate Firestore
+        const existing = getStoredJobs();
+        if (existing.length > 0) {
+          uploadLocalJobsToCloud(userId);
+        }
         return;
       }
 
@@ -399,7 +422,7 @@ export function setupRealtimeSync(
       onUpdate(cloudJobs);
     },
     (err) => {
-      console.error('Firestore real-time sync error:', err);
+      console.error('Firestore real-time sync notice:', err);
     }
   );
 
