@@ -7,10 +7,11 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.16',
+  version: '1.4.17',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v11',
+  build: 'rev-2026.09.05-v12',
   changes: [
+    'Speak VIN App Mic: retry the Android speech-session restart with a short delay so a rejected restart no longer requires re-tapping the mic',
     'Speak VIN App Mic now keeps listening through pauses on Android until all 17 characters are captured, Stop is tapped, or 10s of silence passes; re-tapping the mic appends to the existing VIN instead of replacing it',
     'Resolved Android Chrome & phone audio-focus collision with Spotify: removed aggressive onend speech recognition restart loop that previously caused music to oscillate and cut out',
     'Separated App Microphone from Phone Keyboard Microphone with 3 clear modes: App Live Mic (hands-free), Gemini AI Audio (shop & Spotify music-proof), and Phone Keyboard Mic',

@@ -416,13 +416,24 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
           // or the idle timer fires. Android ends a session at every short pause, so this
           // is what lets a full 17-character VIN be dictated in one go.
           if (isListeningRef.current && recognitionRef.current === recognition) {
-            try {
-              recognition.start();
-            } catch {
-              clearIdleTimer();
-              setIsListening(false);
-              isListeningRef.current = false;
-            }
+            // Chrome can reject start() if called before the previous session has fully
+            // torn down; retry a few times with a short delay before giving up.
+            const restart = (attempt: number) => {
+              if (!isListeningRef.current || recognitionRef.current !== recognition) return;
+              try {
+                recognition.start();
+              } catch (err) {
+                if (attempt < 4) {
+                  setTimeout(() => restart(attempt + 1), 250);
+                } else {
+                  console.warn('SpeechRecognition restart failed:', err);
+                  clearIdleTimer();
+                  setIsListening(false);
+                  isListeningRef.current = false;
+                }
+              }
+            };
+            restart(0);
           } else {
             clearIdleTimer();
             setIsListening(false);
