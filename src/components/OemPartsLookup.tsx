@@ -24,6 +24,7 @@ import {
   buildUniversalOemLinks,
   OemLookupResult,
 } from '../services/oemCatalogService';
+import { getHiddenStoreIds } from '../services/partsStores';
 import { VoiceInputButton } from './VoiceInputButton';
 
 interface OemPartsLookupProps {
@@ -344,25 +345,33 @@ export const OemPartsLookup: React.FC<OemPartsLookupProps> = ({ job, onJobUpdate
               </p>
             </a>
 
-            {/* 2. Brand-New Genuine OEM on eBay */}
-            <a
-              id="btn-oem-ebay-genuine"
-              href={universalLinks.ebayOemNew}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-3.5 rounded-xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/50 transition group flex flex-col justify-between space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4" />
-                  Genuine OEM Inventory
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-400 transition" />
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Search verified brand-new Genuine OEM parts matching this vehicle and VIN.
-              </p>
-            </a>
+            {/* 2. Brand-New Genuine OEM Inventory */}
+            {(() => {
+              const isEbayHidden = getHiddenStoreIds().includes('ebay_salvage');
+              const oemUrl = isEbayHidden ? universalLinks.googleOemShop : universalLinks.ebayOemNew;
+              return (
+                <a
+                  id="btn-oem-genuine-inventory"
+                  href={oemUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3.5 rounded-xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/50 transition group flex flex-col justify-between space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                      <BookOpen className="w-4 h-4" />
+                      Genuine OEM Inventory
+                    </span>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-400 transition" />
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    {isEbayHidden
+                      ? 'Search verified Genuine OEM catalog & wholesale distributor inventory.'
+                      : 'Search verified brand-new Genuine OEM parts matching this vehicle and VIN.'}
+                  </p>
+                </a>
+              );
+            })()}
 
             {/* 3. Dealer Wholesale Parts Counter Map & Call */}
             <a

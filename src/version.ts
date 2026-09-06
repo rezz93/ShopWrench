@@ -7,10 +7,15 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.24',
+  version: '1.4.25',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v19',
+  build: 'rev-2026.09.05-v20',
   changes: [
+    'Parts Supplier Deep-Linking: Carquest and NAPA now launch directly with vehicle & part search query prefilled instead of opening generic homepages',
+    'Delete / Hide Parts Sources: Added 1-tap trash/hide button on all parts sources (including eBay Motors or any other store) with persistent local storage and instant "Restore hidden sources" option',
+    'Smart Retailer Detection: Custom added stores matching Carquest, NAPA, AutoZone, or Advance Auto Parts automatically route to direct catalog searches',
+    'Added Carquest and CarParts.com directly to the default retail and warehouse parts suppliers list',
+    'OEM Genuine Sourcing: If eBay Motors is hidden, the OEM catalog automatically switches Genuine OEM lookup to Google Shopping verified factory catalogs',
     'Find Stores modal: store list (junkyards, local retail, online) was pushed off-screen on phones; whole body now scrolls and the retail-link tip is collapsed',
     'VIN intake simplified: single Voice VIN button (removed duplicate Speak VIN and in-field mic), big mic is the only start/stop control, VIN field read-only while listening so the keyboard stays closed, Gemini tab hidden',
     'Speak VIN: accept spelled-out letter runs the recognizer emits in caps (e.g. "FTFW", "GTH") instead of dropping them; modal now shows a "Heard:" line with the raw speech text',

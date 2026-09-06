@@ -68,6 +68,150 @@ export function formatPartSearchQuery(
 }
 
 export const CUSTOM_STORES_STORAGE_KEY = 'autoshop_custom_parts_stores_v1';
+export const HIDDEN_STORES_STORAGE_KEY = 'autoshop_hidden_parts_stores_v1';
+
+export function getHiddenStoreIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(HIDDEN_STORES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function hideStore(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getHiddenStoreIds();
+    if (!current.includes(id)) {
+      const updated = [...current, id];
+      localStorage.setItem(HIDDEN_STORES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event('autoshop_custom_stores_updated'));
+    }
+  } catch (err) {
+    console.error('Failed to hide store:', err);
+  }
+}
+
+export function unhideStore(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getHiddenStoreIds();
+    const updated = current.filter((sId) => sId !== id);
+    localStorage.setItem(HIDDEN_STORES_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event('autoshop_custom_stores_updated'));
+  } catch (err) {
+    console.error('Failed to unhide store:', err);
+  }
+}
+
+export function restoreAllStores(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(HIDDEN_STORES_STORAGE_KEY);
+    window.dispatchEvent(new Event('autoshop_custom_stores_updated'));
+  } catch (err) {
+    console.error('Failed to restore all stores:', err);
+  }
+}
+
+export function buildSmartCustomStoreUrls(
+  item: { name?: string; website?: string; address?: string },
+  year: string,
+  make: string,
+  model: string,
+  engine: string,
+  partName: string
+): { searchUrl: string; directUrl?: string } {
+  const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+  const nameLower = (item.name || '').toLowerCase();
+  const webLower = (item.website || '').toLowerCase();
+
+  // 1. If explicit URL template was entered with {part}
+  if (item.website && item.website.includes('{part}')) {
+    const searchUrl = item.website
+      .replace('{part}', encodeURIComponent(partName))
+      .replace('{year}', encodeURIComponent(year))
+      .replace('{make}', encodeURIComponent(make))
+      .replace('{model}', encodeURIComponent(model))
+      .replace('{engine}', encodeURIComponent(engine));
+    return { searchUrl };
+  }
+
+  // 2. Brand Recognition: Carquest (Advance Auto network)
+  if (nameLower.includes('carquest') || webLower.includes('carquest')) {
+    return {
+      searchUrl: `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com carquest ${fullQuery}`)}`,
+    };
+  }
+
+  // 3. Brand Recognition: NAPA Auto Parts
+  if (nameLower.includes('napa') || webLower.includes('napaonline')) {
+    return {
+      searchUrl: `https://www.napaonline.com/en/search?query=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:napaonline.com ${fullQuery}`)}`,
+    };
+  }
+
+  // 4. Brand Recognition: AutoZone
+  if (nameLower.includes('autozone') || webLower.includes('autozone')) {
+    return {
+      searchUrl: `https://www.autozone.com/searchresult?searchText=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:autozone.com ${fullQuery}`)}`,
+    };
+  }
+
+  // 5. Brand Recognition: O'Reilly Auto Parts
+  if (nameLower.includes('oreilly') || nameLower.includes("o'reilly") || webLower.includes('oreillyauto')) {
+    return {
+      searchUrl: `https://www.oreillyauto.com/search?q=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:oreillyauto.com ${fullQuery}`)}`,
+    };
+  }
+
+  // 6. Brand Recognition: Advance Auto Parts
+  if (nameLower.includes('advance') || webLower.includes('advanceautoparts')) {
+    return {
+      searchUrl: `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com ${fullQuery}`)}`,
+    };
+  }
+
+  // 7. Brand Recognition: CarParts.com
+  if (nameLower.includes('carparts') || webLower.includes('carparts.com')) {
+    return {
+      searchUrl: `https://www.carparts.com/search?q=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:carparts.com ${fullQuery}`)}`,
+    };
+  }
+
+  // 8. Brand Recognition: RockAuto
+  if (nameLower.includes('rockauto') || webLower.includes('rockauto')) {
+    return {
+      searchUrl: buildRockAutoCatalogUrl(year, make, model, engine, partName),
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`,
+    };
+  }
+
+  // 9. Website URL provided
+  if (item.website && (item.website.startsWith('http://') || item.website.startsWith('https://'))) {
+    const domain = item.website.replace(/^https?:\/\//, '').split('/')[0];
+    return {
+      searchUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:${domain} ${fullQuery}`)}`,
+      directUrl: item.website,
+    };
+  }
+
+  // 10. Fallback: Local Salvage Yard or Shop Name + Address
+  const locationPart = item.address ? ` ${item.address}` : '';
+  return {
+    searchUrl: `https://www.google.com/search?q=${encodeURIComponent(`"${item.name}"${locationPart} ${fullQuery}`)}`,
+  };
+}
 
 export function getCustomStores(): AutoPartsStore[] {
   if (typeof window === 'undefined') return [];
@@ -80,24 +224,12 @@ export function getCustomStores(): AutoPartsStore[] {
         ...item,
         isCustom: true,
         buildSearchUrl: (year: string, make: string, model: string, engine: string, partName: string) => {
-          if (item.website && item.website.includes('{part}')) {
-            return item.website
-              .replace('{part}', encodeURIComponent(partName))
-              .replace('{year}', encodeURIComponent(year))
-              .replace('{make}', encodeURIComponent(make))
-              .replace('{model}', encodeURIComponent(model))
-              .replace('{engine}', encodeURIComponent(engine));
-          }
-          if (item.website && (item.website.startsWith('http://') || item.website.startsWith('https://'))) {
-            // Search on site or Google
-            const domain = item.website.replace(/^https?:\/\//, '').split('/')[0];
-            const q = `site:${domain} ${year} ${make} ${model} ${partName}`.trim();
-            return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-          }
-          // Search specific business name + location/address + vehicle specs
-          const locationPart = item.address ? ` ${item.address}` : '';
-          const q = `"${item.name}"${locationPart} ${year} ${make} ${model} ${partName}`.trim();
-          return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+          const { searchUrl } = buildSmartCustomStoreUrls(item, year, make, model, engine, partName);
+          return searchUrl;
+        },
+        buildDirectProductUrl: (year: string, make: string, model: string, engine: string, partName: string) => {
+          const { directUrl } = buildSmartCustomStoreUrls(item, year, make, model, engine, partName);
+          return directUrl || `https://www.google.com/search?q=${encodeURIComponent(`${item.name} ${year} ${make} ${model} ${partName}`)}`;
         },
       }));
     }
@@ -337,11 +469,28 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     accentColor: 'text-rose-400 hover:border-rose-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`;
+      return `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`;
     },
     buildDirectProductUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com ${fullQuery}`)}`;
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com ${fullQuery}`)}`;
+    },
+  },
+  {
+    id: 'carquest',
+    name: 'Carquest Auto Parts',
+    shortName: 'Carquest',
+    tagline: 'Local commercial & retail hub inventory (Advance / Carquest network)',
+    category: 'Local Retail',
+    badgeColor: 'bg-red-500/20 text-red-400 border-red-500/30',
+    accentColor: 'text-red-400 hover:border-red-500',
+    buildSearchUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`;
+    },
+    buildDirectProductUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com carquest ${fullQuery}`)}`;
     },
   },
   {
@@ -354,7 +503,7 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     accentColor: 'text-blue-400 hover:border-blue-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.napaonline.com/en/search?text=${encodeURIComponent(fullQuery)}`;
+      return `https://www.napaonline.com/en/search?query=${encodeURIComponent(fullQuery)}`;
     },
     buildDirectProductUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
@@ -374,6 +523,23 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
       return `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(fullQuery)}`;
+    },
+  },
+  {
+    id: 'carparts_dot_com',
+    name: 'CarParts.com',
+    shortName: 'CarParts.com',
+    tagline: 'Discount direct replacement body, brake, lighting & suspension parts',
+    category: 'Warehouse Catalog',
+    badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    accentColor: 'text-cyan-400 hover:border-cyan-500',
+    buildSearchUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.carparts.com/search?q=${encodeURIComponent(fullQuery)}`;
+    },
+    buildDirectProductUrl: (year, make, model, engine, partName) => {
+      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:carparts.com ${fullQuery}`)}`;
     },
   },
   {

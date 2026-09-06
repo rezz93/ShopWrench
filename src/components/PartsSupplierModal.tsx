@@ -18,12 +18,16 @@ import {
   Navigation,
   Zap,
   Info,
+  RotateCcw,
 } from 'lucide-react';
 import {
   AUTO_PARTS_STORES,
   AutoPartsStore,
   getCustomStores,
   deleteCustomStore,
+  getHiddenStoreIds,
+  hideStore,
+  restoreAllStores,
   formatPartSearchQuery,
   buildRockAutoCatalogUrl,
 } from '../services/partsStores';
@@ -46,6 +50,7 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
   partName,
 }) => {
   const [customStores, setCustomStores] = useState<AutoPartsStore[]>([]);
+  const [hiddenStoreIds, setHiddenStoreIds] = useState<string[]>([]);
   const [copiedStore, setCopiedStore] = useState<string | null>(null);
   const [justCopiedQuery, setJustCopiedQuery] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<CategoryFilter>('all');
@@ -54,12 +59,14 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setCustomStores(getCustomStores());
+      setHiddenStoreIds(getHiddenStoreIds());
     }
   }, [isOpen]);
 
   useEffect(() => {
     const handleUpdate = () => {
       setCustomStores(getCustomStores());
+      setHiddenStoreIds(getHiddenStoreIds());
     };
     window.addEventListener('autoshop_custom_stores_updated', handleUpdate);
     return () => window.removeEventListener('autoshop_custom_stores_updated', handleUpdate);
@@ -67,7 +74,9 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
 
   if (!isOpen) return null;
 
-  const allStores = [...customStores, ...AUTO_PARTS_STORES];
+  const allStores = [...customStores, ...AUTO_PARTS_STORES].filter(
+    (store) => !hiddenStoreIds.includes(store.id)
+  );
 
   const { cleanPart, fullQuery, vehicleQuery } = formatPartSearchQuery(
     vehicle.year,
@@ -128,11 +137,18 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
     setTimeout(() => setJustCopiedQuery(false), 2000);
   };
 
-  const handleDeleteCustomStore = (e: React.MouseEvent, id: string) => {
+  const handleRemoveStore = (e: React.MouseEvent, store: AutoPartsStore) => {
     e.stopPropagation();
-    if (window.confirm('Remove this custom supplier from your list?')) {
-      deleteCustomStore(id);
-      setCustomStores(getCustomStores());
+    if (store.isCustom) {
+      if (window.confirm(`Delete custom supplier "${store.name}" from your list?`)) {
+        deleteCustomStore(store.id);
+        setCustomStores(getCustomStores());
+      }
+    } else {
+      if (window.confirm(`Hide "${store.name}" from your parts sources? You can restore it anytime.`)) {
+        hideStore(store.id);
+        setHiddenStoreIds(getHiddenStoreIds());
+      }
     }
   };
 
@@ -454,16 +470,14 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded border whitespace-nowrap ${store.badgeColor}`}>
                           {store.category}
                         </span>
-                        {store.isCustom && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteCustomStore(e, store.id)}
-                            title="Delete custom supplier"
-                            className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleRemoveStore(e, store)}
+                          title={store.isCustom ? `Delete custom supplier "${store.name}"` : `Hide "${store.name}" from parts sources`}
+                          className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
@@ -563,15 +577,32 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-5 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsAddStoreModalOpen(true)}
-              className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Another Local Junkyard or Auto Parts Store</span>
-            </button>
+          <div className="px-5 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsAddStoreModalOpen(true)}
+                className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Local Store or Junkyard</span>
+              </button>
+
+              {hiddenStoreIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    restoreAllStores();
+                    setHiddenStoreIds([]);
+                  }}
+                  className="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-1.5 underline underline-offset-2 transition cursor-pointer"
+                  title="Restore all hidden default parts sources"
+                >
+                  <RotateCcw className="w-3 h-3 text-amber-400" />
+                  <span>Restore {hiddenStoreIds.length} hidden source{hiddenStoreIds.length > 1 ? 's' : ''}</span>
+                </button>
+              )}
+            </div>
 
             <button
               onClick={onClose}
