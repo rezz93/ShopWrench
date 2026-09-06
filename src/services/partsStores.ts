@@ -144,8 +144,8 @@ export function buildSmartCustomStoreUrls(
   // 2. Brand Recognition: Carquest (Advance Auto network)
   if (nameLower.includes('carquest') || webLower.includes('carquest')) {
     return {
-      searchUrl: `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com carquest ${fullQuery}`)}`,
+      searchUrl: `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com carquest ${fullQuery}`)}`,
     };
   }
 
@@ -176,8 +176,8 @@ export function buildSmartCustomStoreUrls(
   // 6. Brand Recognition: Advance Auto Parts
   if (nameLower.includes('advance') || webLower.includes('advanceautoparts')) {
     return {
-      searchUrl: `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com ${fullQuery}`)}`,
+      searchUrl: `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`,
+      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com ${fullQuery}`)}`,
     };
   }
 
@@ -469,11 +469,11 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     accentColor: 'text-rose-400 hover:border-rose-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`;
+      return `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`;
     },
     buildDirectProductUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com ${fullQuery}`)}`;
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com ${fullQuery}`)}`;
     },
   },
   {
@@ -486,11 +486,11 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     accentColor: 'text-red-400 hover:border-red-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.advanceautoparts.com/search?q=${encodeURIComponent(fullQuery)}`;
+      return `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`;
     },
     buildDirectProductUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:advanceautoparts.com carquest ${fullQuery}`)}`;
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com carquest ${fullQuery}`)}`;
     },
   },
   {

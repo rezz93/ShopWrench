@@ -7,10 +7,12 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.25',
+  version: '1.4.26',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v20',
+  build: 'rev-2026.09.05-v21',
   changes: [
+    'Advance Auto & Carquest Deep-Link Fix: Restored shop.advanceautoparts.com/c3/search?query= endpoint so searches instantly display parts on site without failing on URL query routing',
+    'Genuine OEM Inventory -> Official Factory Catalog: "Genuine OEM Inventory" button now opens the official manufacturer parts catalog for that specific vehicle (e.g. BMWPartsDeal/RealOEM for BMW, GMPartsDirect for GM, OEMFordPart for Ford, ToyotaPartsDeal for Toyota, HondaPartsNow for Honda, etc.) with prefilled VIN and part query instead of eBay Motors',
     'Parts Supplier Deep-Linking: Carquest and NAPA now launch directly with vehicle & part search query prefilled instead of opening generic homepages',
     'Delete / Hide Parts Sources: Added 1-tap trash/hide button on all parts sources (including eBay Motors or any other store) with persistent local storage and instant "Restore hidden sources" option',
     'Smart Retailer Detection: Custom added stores matching Carquest, NAPA, AutoZone, or Advance Auto Parts automatically route to direct catalog searches',

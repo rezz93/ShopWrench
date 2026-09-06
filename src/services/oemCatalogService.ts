@@ -297,19 +297,23 @@ export function getOemPortalForMake(make: string): OemPortalInfo {
     return {
       brandName: 'BMW Original Teile (Genuine Parts)',
       manufacturer: 'Bayerische Motoren Werke AG',
-      portalName: 'RealOEM & BMW Dealer Parts',
-      portalUrl: 'https://www.realoem.com/bmw/enUS/select',
-      tagline: 'Official RealOEM exploded parts catalogs & ETK schematic diagrams',
+      portalName: 'BMWPartsDeal & RealOEM Dealer Catalog',
+      portalUrl: 'https://www.bmwpartsdeal.com/',
+      tagline: 'Official BMW factory parts catalog, ETK diagrams & wholesale dealer inventory',
       accentColor: 'text-sky-400',
       badgeBg: 'bg-sky-500/20 text-sky-300',
       badgeBorder: 'border-sky-500/40',
-      buildVinCatalogUrl: (vin) => {
+      buildVinCatalogUrl: (vin, partQuery) => {
+        if (partQuery) {
+          const q = `${vin} ${partQuery}`.trim();
+          return `https://www.bmwpartsdeal.com/parts-list?keywords=${encodeURIComponent(q)}`;
+        }
         const last7 = vin.slice(-7);
         return `https://www.realoem.com/bmw/enUS/select?vin=${encodeURIComponent(last7 || vin)}`;
       },
       buildPartCatalogUrl: (year, make, model, partQuery) => {
-        const q = `site:realoem.com ${year} ${make} ${model} ${partQuery}`.trim();
-        return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+        const q = `${year} ${make} ${model} ${partQuery}`.trim();
+        return `https://www.bmwpartsdeal.com/parts-list?keywords=${encodeURIComponent(q)}`;
       },
       buildDiagramUrl: (year, make, model, partQuery, vin) => {
         const q = `${year} ${make} ${model} ${partQuery} RealOEM BMW exploded parts diagram schematic ${vin || ''}`.trim();
@@ -392,8 +396,15 @@ export function buildUniversalOemLinks(
 ) {
   const cleanPart = partQuery.trim() || 'Engine Parts';
   const vehicleStr = [year, make, model, engine].filter(Boolean).join(' ');
+  const portal = getOemPortalForMake(make);
+  const officialOemCatalog = vin
+    ? portal.buildVinCatalogUrl(vin, cleanPart)
+    : portal.buildPartCatalogUrl(year, make, model, cleanPart, engine);
 
   return {
+    // Official Vehicle Manufacturer OEM Dealer Catalog & Schematics Portal
+    officialOemCatalog,
+
     // Brand-New Genuine OEM parts on eBay Motors (Filtered for condition NEW and OE Genuine)
     ebayOemNew: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(
       `${vehicleStr} ${cleanPart} Genuine OEM new ${vin ? vin.slice(-8) : ''}`.trim()
