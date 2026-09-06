@@ -177,9 +177,33 @@ export default function App() {
         <div className="flex items-center gap-2">
           <Wrench className="w-4 h-4 text-amber-500" />
           <span>ShopWrench Tactile Tech Console</span>
-          <span className="font-mono text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-slate-400">
-            v{APP_VERSION}
-          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  for (const reg of regs) {
+                    await reg.update();
+                  }
+                }
+                if ('caches' in window) {
+                  const keys = await caches.keys();
+                  for (const key of keys) {
+                    await caches.delete(key);
+                  }
+                }
+              } catch {
+                // ignore
+              }
+              window.location.reload();
+            }}
+            className="font-mono text-[10px] bg-slate-900 hover:bg-slate-800 px-2 py-0.5 rounded border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-amber-400 transition cursor-pointer flex items-center gap-1"
+            title="Click to check for updates & reload cache"
+          >
+            <span>v{APP_VERSION}</span>
+            <RotateCcw className="w-2.5 h-2.5 text-slate-500 hover:text-amber-400" />
+          </button>
         </div>
 
         <div className="flex items-center gap-4">
