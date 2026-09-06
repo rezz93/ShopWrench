@@ -7,10 +7,11 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.22',
+  version: '1.4.23',
   releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v17',
+  build: 'rev-2026.09.05-v18',
   changes: [
+    'VIN intake simplified: single Voice VIN button (removed duplicate Speak VIN and in-field mic), big mic is the only start/stop control, VIN field read-only while listening so the keyboard stays closed, Gemini tab hidden',
     'Speak VIN: accept spelled-out letter runs the recognizer emits in caps (e.g. "FTFW", "GTH") instead of dropping them; modal now shows a "Heard:" line with the raw speech text',
     'Speak VIN App Mic on phones is back to direct live recognition (text appears as you speak); fixed Android duplicating characters ("1" -> "11") by committing each final result once and running one utterance per session',
     'Fix Gemini transcription 400 error: strip codecs data-URL prefix before sending audio',

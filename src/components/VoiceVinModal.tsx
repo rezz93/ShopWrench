@@ -157,7 +157,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
                 Speak Vehicle VIN
               </h3>
               <p className="text-xs text-slate-400">
-                Choose App Microphone or Phone Keyboard Mic
+                Tap the mic, speak the VIN, tap again to stop
               </p>
             </div>
           </div>
@@ -169,8 +169,9 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
           </button>
         </div>
 
-        {/* 3-Way Mode Selector Tabs: App Live Mic vs Gemini AI vs Phone Keyboard Mic */}
-        <div className="grid grid-cols-3 p-1 bg-slate-950/90 rounded-xl border border-slate-800 text-[11px] font-bold">
+        {/* Mode Selector Tabs: App Live Mic vs Phone Keyboard Mic (Gemini tab hidden until the
+            hosted server exposes /api/transcribe-audio) */}
+        <div className="grid grid-cols-2 p-1 bg-slate-950/90 rounded-xl border border-slate-800 text-[11px] font-bold">
           <button
             type="button"
             onClick={() => {
@@ -185,22 +186,6 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
           >
             <Radio className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">⚡ App Mic</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              stopListening();
-              setActiveTab('ai');
-            }}
-            className={`py-2 px-1.5 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer text-center ${
-              activeTab === 'ai'
-                ? 'bg-purple-600 text-white font-black shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">🧠 Gemini AI</span>
           </button>
 
           <button
@@ -257,40 +242,17 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
                 {isProcessing
                   ? 'Transcribing VIN...'
                   : isAiRecording
-                  ? 'Recording... Speak the full VIN, then tap Stop'
+                  ? 'Recording... tap the button to stop'
                   : isListening
                   ? parsedVin.length > 0
-                    ? `Live: ${parsedVin.length}/17 Characters`
-                    : 'App Mic Listening... Speak letters or NATO words'
-                  : 'Tap Big Mic to Speak'}
+                    ? `Listening (${parsedVin.length}/17)... tap the button to stop`
+                    : 'Listening... speak letters or NATO words, tap to stop'
+                  : 'Tap the mic to start'}
               </span>
               {spokenText && (
                 <p className="text-xs text-slate-400 italic max-w-sm px-4 truncate">
                   &ldquo;{spokenText}&rdquo;
                 </p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              {isLiveActive ? (
-                <button
-                  type="button"
-                  onClick={stopListening}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
-                >
-                  <Square className="w-3.5 h-3.5 fill-current" />
-                  <span>Done Speaking (Release Mic)</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => startListening(parsedVin)}
-                  disabled={isProcessing}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 hover:border-amber-400/50 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
-                >
-                  <Mic className="w-3.5 h-3.5" />
-                  <span>Start App Microphone</span>
-                </button>
               )}
             </div>
 
@@ -301,7 +263,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             )}
 
             <p className="text-[11px] text-slate-500 flex items-center gap-1">
-              <span>Keeps listening through pauses (phones beep between phrases — that's normal). Stops at 17 characters, when you tap Stop, or after 10s of silence. Tap again to add more.</span>
+              <span>Tap once to start, tap again to stop — no need to hold. Keeps listening through pauses (phones beep between phrases — that's normal). Stops at 17 characters or after 10s of silence. Tap again to add more.</span>
             </p>
           </div>
         )}
@@ -453,6 +415,8 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
               type="text"
               maxLength={80}
               value={parsedVin}
+              readOnly={isLiveActive || isProcessing}
+              inputMode={isLiveActive || isProcessing ? 'none' : 'text'}
               onChange={(e) => {
                 const { vin } = formatAndParseVin(e.target.value);
                 setParsedVin(vin);
@@ -473,7 +437,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
           </div>
 
           <p className="text-[11px] text-slate-500 text-center">
-            Tap and edit any character above if needed.
+            {isLiveActive ? 'Stop the mic to edit characters by hand.' : 'Tap and edit any character above if needed.'}
           </p>
         </div>
 
@@ -516,7 +480,7 @@ export const VoiceVinModal: React.FC<VoiceVinModalProps> = ({
             <br />
             • Or NATO words: <span className="text-amber-300">One Golf Tango Hotel Six Bravo...</span>
             <br />
-            • Background music? Switch to <strong>🧠 Gemini AI</strong> or use <strong>⌨️ Phone Mic</strong>.
+            • Speak in groups of 3–4 characters with a short pause between groups.
           </p>
         </div>
 
