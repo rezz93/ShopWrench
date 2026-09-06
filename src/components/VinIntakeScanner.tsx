@@ -331,21 +331,6 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                 </span>
               </label>
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  id="voice-dictate-vin-btn"
-                  onClick={() => {
-                    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
-                      document.activeElement.blur();
-                    }
-                    setIsVoiceModalOpen(true);
-                  }}
-                  className="min-h-[36px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
-                  title="Speak VIN (App Mic, Gemini AI, or Phone Keyboard)"
-                >
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Speak VIN</span>
-                </button>
                 {cleanVin.length > 0 && (
                   <span className={`text-xs font-mono font-medium ${cleanVin.length === 17 ? 'text-emerald-400' : 'text-slate-400'}`}>
                     {cleanVin.length}/17
@@ -355,7 +340,7 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              {/* 17-Digit VIN Input with Direct Voice Dictation */}
+              {/* 17-Digit VIN Input */}
               <div className="relative flex-1">
                 <input
                   id="vin-input-field"
@@ -379,7 +364,7 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                       handleDecode();
                     }
                   }}
-                  className="w-full min-h-[54px] px-4 pl-11 pr-28 text-base sm:text-lg font-mono font-bold tracking-wider text-white bg-slate-950 border-2 border-slate-700 rounded-xl focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 placeholder:text-slate-600 transition"
+                  className="w-full min-h-[54px] px-4 pl-11 pr-20 text-base sm:text-lg font-mono font-bold tracking-wider text-white bg-slate-950 border-2 border-slate-700 rounded-xl focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 placeholder:text-slate-600 transition"
                 />
                 <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -396,25 +381,11 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                       CLEAR
                     </button>
                   )}
-                  <VoiceInputButton
-                    id="voice-vin-direct-inline-btn"
-                    size="sm"
-                    mode="replace"
-                    voiceMode="vin"
-                    onTranscript={(text) => {
-                      const { vin } = formatAndParseVin(text);
-                      if (vin) {
-                        setVinInput(vin);
-                        if (errorMsg) setErrorMsg(null);
-                      }
-                    }}
-                    title="Speak VIN directly into this field (NATO words or digits supported)"
-                  />
                 </div>
               </div>
 
-              {/* Action Buttons: Decode & Scan */}
-              <div className="flex gap-2">
+              {/* Action Buttons: Decode, Scan & Voice */}
+              <div className="flex flex-wrap gap-2">
                 <button
                   id="decode-vin-btn"
                   type="button"
@@ -471,13 +442,6 @@ export const VinIntakeScanner: React.FC<VinIntakeScannerProps> = ({
                 <span>Converted spoken words/spaces from your phone keyboard into a clean VIN! ({cleanVin.length}/17)</span>
               </div>
             )}
-
-            {/* Phone Dictation Guidance */}
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 pt-0.5">
-              <span>
-                💡 <strong>Phone Tip:</strong> Tap the box &amp; press 🎙️ on your <strong>phone keyboard</strong> to dictate, or tap <strong>Speak VIN</strong> for the hands-free app mic.
-              </span>
-            </div>
 
             {/* Helper: Switch to Manual Entry if No VIN */}
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pt-1 border-t border-slate-800/80">
