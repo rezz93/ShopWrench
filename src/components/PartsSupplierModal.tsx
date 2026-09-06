@@ -172,16 +172,16 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
       >
         <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
           {/* Modal Header */}
-          <div className="px-5 py-4 bg-slate-800/95 border-b border-slate-700/80 flex items-center justify-between">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 bg-slate-800/95 border-b border-slate-700/80 flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
                 <Store className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
                   <span>Find Part at Stores &amp; Junkyards</span>
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-400 hidden sm:block">
                   Search auto parts stores, local salvage yards &amp; recycler networks
                 </p>
               </div>
@@ -196,7 +196,8 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
                 title="Add your local junkyard or parts shop"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Add Local Store / Yard</span>
+                <span className="hidden sm:inline">Add Local Store / Yard</span>
+                <span className="sm:hidden">Add</span>
               </button>
 
               <button
@@ -210,6 +211,9 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
             </div>
           </div>
 
+          {/* Scrollable body: banner, category tabs and store grid all scroll together so the
+              store list is always reachable on small phone screens */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
           {/* Vehicle & Part Information Banner */}
           <div className="p-4 sm:p-5 bg-slate-950/80 border-b border-slate-800 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/90 p-3.5 rounded-xl border border-slate-700/80">
@@ -327,18 +331,18 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
               </div>
             </div>
 
-            {/* Explanatory Tip for Retail Sites */}
-            <div className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-slate-400 text-xs flex items-start gap-2.5">
-              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <div className="space-y-0.5">
-                <p className="text-slate-300 font-semibold text-xs">
+            {/* Explanatory Tip for Retail Sites (collapsed by default to keep the store list visible) */}
+            <details className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-slate-400 text-xs">
+              <summary className="flex items-start gap-2.5 cursor-pointer list-none">
+                <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span className="text-slate-300 font-semibold text-xs">
                   Why do some store links (AutoZone / Advance) open to their main page?
-                </p>
-                <p className="text-[11px] text-slate-400 leading-normal">
-                  Big chains wipe search parameters on direct external links if you don&apos;t have a local store/vehicle cookie saved. We&apos;ve <strong>automatically copied &quot;{fullQuery}&quot; to your clipboard</strong>! When the store opens, simply paste (Ctrl+V) into their search bar, or use the <em>&quot;Direct Product Link&quot;</em> button below.
-                </p>
-              </div>
-            </div>
+                </span>
+              </summary>
+              <p className="text-[11px] text-slate-400 leading-normal mt-1.5 pl-6">
+                Big chains wipe search parameters on direct external links if you don&apos;t have a local store/vehicle cookie saved. We&apos;ve <strong>automatically copied &quot;{fullQuery}&quot; to your clipboard</strong>! When the store opens, simply paste (Ctrl+V) into their search bar, or use the <em>&quot;Direct Product Link&quot;</em> button below.
+              </p>
+            </details>
 
             {copiedStore && (
               <div className="p-3 bg-emerald-950/80 border border-emerald-500/60 rounded-xl text-emerald-200 text-xs flex items-center justify-between animate-in fade-in">
@@ -423,7 +427,7 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
           </div>
 
           {/* Stores Grid */}
-          <div className="p-4 sm:p-5 flex-1 overflow-y-auto space-y-3">
+          <div className="p-4 sm:p-5 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filteredStores.map((store) => (
                 <div
@@ -556,9 +560,10 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
               ))}
             </div>
           </div>
+          </div>
 
           {/* Footer */}
-          <div className="px-5 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between">
+          <div className="px-5 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between shrink-0">
             <button
               type="button"
               onClick={() => setIsAddStoreModalOpen(true)}
