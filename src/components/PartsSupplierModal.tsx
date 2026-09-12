@@ -99,13 +99,13 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
   const junkyardCount = allStores.filter((s) => s.isJunkyard).length;
   const retailCount = allStores.filter((s) => s.category === 'Local Retail' || s.category === 'Commercial & Heavy Duty').length;
 
-  const handleLaunchStore = (store: AutoPartsStore, useDirectProduct = false) => {
+  const handleLaunchStore = (store: AutoPartsStore, useSecondaryLink = false) => {
     navigator.clipboard.writeText(fullQuery);
     setCopiedStore(store.name);
 
     let url = '';
-    if (useDirectProduct && store.buildDirectProductUrl) {
-      url = store.buildDirectProductUrl(
+    if (useSecondaryLink && store.buildSecondaryUrl) {
+      url = store.buildSecondaryUrl(
         vehicle.year,
         vehicle.make,
         vehicle.model,
@@ -352,11 +352,11 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
               <summary className="flex items-start gap-2.5 cursor-pointer list-none">
                 <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <span className="text-slate-300 font-semibold text-xs">
-                  Why do some store links (AutoZone / Advance) open to their main page?
+                  Why do some store links still land on a category or home page?
                 </span>
               </summary>
               <p className="text-[11px] text-slate-400 leading-normal mt-1.5 pl-6">
-                Big chains wipe search parameters on direct external links if you don&apos;t have a local store/vehicle cookie saved. We&apos;ve <strong>automatically copied &quot;{fullQuery}&quot; to your clipboard</strong>! When the store opens, simply paste (Ctrl+V) into their search bar, or use the <em>&quot;Direct Product Link&quot;</em> button below.
+                Store links open the retailer&apos;s own search results for this part, but a chain can still drop you on a category or home page when it can&apos;t match the vehicle without a saved store/vehicle cookie. We&apos;ve <strong>automatically copied &quot;{fullQuery}&quot; to your clipboard</strong>, so you can paste (Ctrl+V) straight into their search bar. Exact fitment usually needs the vehicle selected on the retailer&apos;s site.
               </p>
             </details>
 
@@ -556,17 +556,16 @@ export const PartsSupplierModal: React.FC<PartsSupplierModalProps> = ({
                       <ExternalLink className={`w-4 h-4 transition ${store.isJunkyard ? 'text-emerald-400 group-hover:text-slate-950' : 'text-amber-400 group-hover:text-slate-950'}`} />
                     </button>
 
-                    {/* Direct Product Link for stores with homepage redirects */}
-                    {store.buildDirectProductUrl && (
+                    {store.buildSecondaryUrl && store.secondaryLinkLabel && (
                       <button
                         type="button"
-                        id={`direct-product-${store.id}-btn`}
+                        id={`secondary-link-${store.id}-btn`}
                         onClick={() => handleLaunchStore(store, true)}
                         className="w-full min-h-[36px] px-3 py-1.5 rounded-lg font-semibold text-[11px] bg-slate-900/80 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 hover:border-amber-500/40 flex items-center justify-center gap-1.5 transition cursor-pointer"
-                        title={`Opens directly indexed ${store.shortName} product pages via Google (bypasses homepage redirect)`}
+                        title={store.secondaryLinkLabel}
                       >
                         <Zap className="w-3 h-3 text-amber-400" />
-                        <span>Direct Product Link (Bypass Redirect)</span>
+                        <span>{store.secondaryLinkLabel}</span>
                       </button>
                     )}
                   </div>

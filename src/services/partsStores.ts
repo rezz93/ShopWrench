@@ -14,8 +14,20 @@ export interface AutoPartsStore {
   notes?: string;
   createdAt?: string;
   buildSearchUrl: (year: string, make: string, model: string, engine: string, partName: string) => string;
-  buildDirectProductUrl?: (year: string, make: string, model: string, engine: string, partName: string) => string;
+  secondaryLinkLabel?: string;
+  buildSecondaryUrl?: (year: string, make: string, model: string, engine: string, partName: string) => string;
 }
+
+export function buildAdvanceSearchUrl(query: string): string {
+  return `https://shop.advanceautoparts.com/web/SearchResults?searchTerm=${encodeURIComponent(query)}`;
+}
+
+export function buildNapaSearchUrl(query: string): string {
+  return `https://www.napaonline.com/en/search?text=${encodeURIComponent(query)}`;
+}
+
+export const CARQUEST_STORE_LOCATOR_URL = 'https://www.carquest.com/locations';
+export const ADVANCE_STORE_LOCATOR_URL = 'https://stores.advanceautoparts.com';
 
 export function formatPartSearchQuery(
   year: string,
@@ -125,7 +137,7 @@ export function buildSmartCustomStoreUrls(
   model: string,
   engine: string,
   partName: string
-): { searchUrl: string; directUrl?: string } {
+): { searchUrl: string; secondaryLabel?: string; secondaryUrl?: string } {
   const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
   const nameLower = (item.name || '').toLowerCase();
   const webLower = (item.website || '').toLowerCase();
@@ -141,59 +153,50 @@ export function buildSmartCustomStoreUrls(
     return { searchUrl };
   }
 
-  // 2. Brand Recognition: Carquest (Advance Auto network)
+  // 2. Brand Recognition: Carquest (parts catalog runs on the Advance Auto platform)
   if (nameLower.includes('carquest') || webLower.includes('carquest')) {
     return {
-      searchUrl: `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com carquest ${fullQuery}`)}`,
+      searchUrl: buildAdvanceSearchUrl(`Carquest ${fullQuery}`),
+      secondaryLabel: 'Carquest Store Locator',
+      secondaryUrl: item.website || CARQUEST_STORE_LOCATOR_URL,
     };
   }
 
   // 3. Brand Recognition: NAPA Auto Parts
   if (nameLower.includes('napa') || webLower.includes('napaonline')) {
-    return {
-      searchUrl: `https://www.napaonline.com/en/search?query=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:napaonline.com ${fullQuery}`)}`,
-    };
+    return { searchUrl: buildNapaSearchUrl(fullQuery) };
   }
 
   // 4. Brand Recognition: AutoZone
   if (nameLower.includes('autozone') || webLower.includes('autozone')) {
-    return {
-      searchUrl: `https://www.autozone.com/searchresult?searchText=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:autozone.com ${fullQuery}`)}`,
-    };
+    return { searchUrl: `https://www.autozone.com/searchresult?searchText=${encodeURIComponent(fullQuery)}` };
   }
 
   // 5. Brand Recognition: O'Reilly Auto Parts
   if (nameLower.includes('oreilly') || nameLower.includes("o'reilly") || webLower.includes('oreillyauto')) {
-    return {
-      searchUrl: `https://www.oreillyauto.com/search?q=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:oreillyauto.com ${fullQuery}`)}`,
-    };
+    return { searchUrl: `https://www.oreillyauto.com/search?q=${encodeURIComponent(fullQuery)}` };
   }
 
   // 6. Brand Recognition: Advance Auto Parts
   if (nameLower.includes('advance') || webLower.includes('advanceautoparts')) {
     return {
-      searchUrl: `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com ${fullQuery}`)}`,
+      searchUrl: buildAdvanceSearchUrl(fullQuery),
+      secondaryLabel: 'Advance Store Locator',
+      secondaryUrl: item.website || ADVANCE_STORE_LOCATOR_URL,
     };
   }
 
   // 7. Brand Recognition: CarParts.com
   if (nameLower.includes('carparts') || webLower.includes('carparts.com')) {
-    return {
-      searchUrl: `https://www.carparts.com/search?q=${encodeURIComponent(fullQuery)}`,
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:carparts.com ${fullQuery}`)}`,
-    };
+    return { searchUrl: `https://www.carparts.com/search?q=${encodeURIComponent(fullQuery)}` };
   }
 
   // 8. Brand Recognition: RockAuto
   if (nameLower.includes('rockauto') || webLower.includes('rockauto')) {
     return {
       searchUrl: buildRockAutoCatalogUrl(year, make, model, engine, partName),
-      directUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`,
+      secondaryLabel: 'Find part page via Google',
+      secondaryUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`,
     };
   }
 
@@ -202,7 +205,8 @@ export function buildSmartCustomStoreUrls(
     const domain = item.website.replace(/^https?:\/\//, '').split('/')[0];
     return {
       searchUrl: `https://www.google.com/search?q=${encodeURIComponent(`site:${domain} ${fullQuery}`)}`,
-      directUrl: item.website,
+      secondaryLabel: 'Open store website',
+      secondaryUrl: item.website,
     };
   }
 
@@ -220,18 +224,24 @@ export function getCustomStores(): AutoPartsStore[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.map((item: any) => ({
-        ...item,
-        isCustom: true,
-        buildSearchUrl: (year: string, make: string, model: string, engine: string, partName: string) => {
-          const { searchUrl } = buildSmartCustomStoreUrls(item, year, make, model, engine, partName);
-          return searchUrl;
-        },
-        buildDirectProductUrl: (year: string, make: string, model: string, engine: string, partName: string) => {
-          const { directUrl } = buildSmartCustomStoreUrls(item, year, make, model, engine, partName);
-          return directUrl || `https://www.google.com/search?q=${encodeURIComponent(`${item.name} ${year} ${make} ${model} ${partName}`)}`;
-        },
-      }));
+      return parsed.map((item: any) => {
+        const { secondaryLabel } = buildSmartCustomStoreUrls(item, '', '', '', '', '');
+        return {
+          ...item,
+          isCustom: true,
+          buildSearchUrl: (year: string, make: string, model: string, engine: string, partName: string) => {
+            const { searchUrl } = buildSmartCustomStoreUrls(item, year, make, model, engine, partName);
+            return searchUrl;
+          },
+          secondaryLinkLabel: secondaryLabel,
+          buildSecondaryUrl: secondaryLabel
+            ? (year: string, make: string, model: string, engine: string, partName: string) => {
+                const { secondaryUrl } = buildSmartCustomStoreUrls(item, year, make, model, engine, partName);
+                return secondaryUrl || '';
+              }
+            : undefined,
+        };
+      });
     }
     return [];
   } catch (err) {
@@ -348,7 +358,8 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
       const q = `${year} ${make} ${model} ${partName} official OEM factory parts dealer wholesale catalog`.trim();
       return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
     },
-    buildDirectProductUrl: (year, make, model, _engine, partName) => {
+    secondaryLinkLabel: 'OEM part number & diagram search',
+    buildSecondaryUrl: (year, make, model, _engine, partName) => {
       const q = `${year} ${make} ${model} ${partName} OEM genuine part number diagram`.trim();
       return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
     },
@@ -437,10 +448,6 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
       return `https://www.autozone.com/searchresult?searchText=${encodeURIComponent(fullQuery)}`;
     },
-    buildDirectProductUrl: (year, make, model, engine, partName) => {
-      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:autozone.com ${fullQuery}`)}`;
-    },
   },
   {
     id: 'oreilly',
@@ -454,10 +461,6 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
       return `https://www.oreillyauto.com/search?q=${encodeURIComponent(fullQuery)}`;
     },
-    buildDirectProductUrl: (year, make, model, engine, partName) => {
-      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:oreillyauto.com ${fullQuery}`)}`;
-    },
   },
   {
     id: 'advance',
@@ -469,29 +472,25 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     accentColor: 'text-rose-400 hover:border-rose-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`;
+      return buildAdvanceSearchUrl(fullQuery);
     },
-    buildDirectProductUrl: (year, make, model, engine, partName) => {
-      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com ${fullQuery}`)}`;
-    },
+    secondaryLinkLabel: 'Advance Store Locator',
+    buildSecondaryUrl: () => ADVANCE_STORE_LOCATOR_URL,
   },
   {
     id: 'carquest',
     name: 'Carquest Auto Parts',
     shortName: 'Carquest',
-    tagline: 'Local commercial & retail hub inventory (Advance / Carquest network)',
+    tagline: 'Carquest-brand parts search (catalog is hosted on the Advance Auto platform)',
     category: 'Local Retail',
     badgeColor: 'bg-red-500/20 text-red-400 border-red-500/30',
     accentColor: 'text-red-400 hover:border-red-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://shop.advanceautoparts.com/c3/search?query=${encodeURIComponent(fullQuery)}`;
+      return buildAdvanceSearchUrl(`Carquest ${fullQuery}`);
     },
-    buildDirectProductUrl: (year, make, model, engine, partName) => {
-      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:shop.advanceautoparts.com carquest ${fullQuery}`)}`;
-    },
+    secondaryLinkLabel: 'Carquest Store Locator',
+    buildSecondaryUrl: () => CARQUEST_STORE_LOCATOR_URL,
   },
   {
     id: 'napa',
@@ -503,11 +502,7 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     accentColor: 'text-blue-400 hover:border-blue-500',
     buildSearchUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.napaonline.com/en/search?query=${encodeURIComponent(fullQuery)}`;
-    },
-    buildDirectProductUrl: (year, make, model, engine, partName) => {
-      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:napaonline.com ${fullQuery}`)}`;
+      return buildNapaSearchUrl(fullQuery);
     },
   },
 
@@ -537,10 +532,6 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
       return `https://www.carparts.com/search?q=${encodeURIComponent(fullQuery)}`;
     },
-    buildDirectProductUrl: (year, make, model, engine, partName) => {
-      const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
-      return `https://www.google.com/search?q=${encodeURIComponent(`site:carparts.com ${fullQuery}`)}`;
-    },
   },
   {
     id: 'rockauto',
@@ -553,7 +544,8 @@ export const AUTO_PARTS_STORES: AutoPartsStore[] = [
     buildSearchUrl: (year, make, model, engine, partName) => {
       return buildRockAutoCatalogUrl(year, make, model, engine, partName);
     },
-    buildDirectProductUrl: (year, make, model, engine, partName) => {
+    secondaryLinkLabel: 'Find part page via Google',
+    buildSecondaryUrl: (year, make, model, engine, partName) => {
       const { fullQuery } = formatPartSearchQuery(year, make, model, engine, partName);
       return `https://www.google.com/search?q=${encodeURIComponent(`site:rockauto.com ${fullQuery}`)}`;
     },

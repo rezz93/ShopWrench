@@ -7,10 +7,13 @@ export interface VersionInfo {
 }
 
 export const APP_VERSION_INFO: VersionInfo = {
-  version: '1.4.26',
-  releaseDate: '2026-09-05',
-  build: 'rev-2026.09.05-v21',
+  version: '1.4.27',
+  releaseDate: '2026-09-11',
+  build: 'rev-2026.09.11-v22',
   changes: [
+    'Store Link Fixes: Advance Auto & Carquest now use shop.advanceautoparts.com/web/SearchResults?searchTerm= (the old /c3/search URL returned a 404 page) and NAPA uses napaonline.com/en/search?text= (the old ?query= parameter was ignored and bounced to the NAPA home page)',
+    'Carquest: parts search now runs Carquest-branded results on the Advance catalog and a separate "Carquest Store Locator" button opens carquest.com instead of silently opening Advance Auto',
+    'Removed the misleading "Direct Product Link (Bypass Redirect)" button that opened a Google site: search; each store now shows only an accurate secondary link (store locator, or Google lookup for RockAuto, which has no part-name search)',
     'Advance Auto & Carquest Deep-Link Fix: Restored shop.advanceautoparts.com/c3/search?query= endpoint so searches instantly display parts on site without failing on URL query routing',
     'Genuine OEM Inventory -> Official Factory Catalog: "Genuine OEM Inventory" button now opens the official manufacturer parts catalog for that specific vehicle (e.g. BMWPartsDeal/RealOEM for BMW, GMPartsDirect for GM, OEMFordPart for Ford, ToyotaPartsDeal for Toyota, HondaPartsNow for Honda, etc.) with prefilled VIN and part query instead of eBay Motors',
     'Parts Supplier Deep-Linking: Carquest and NAPA now launch directly with vehicle & part search query prefilled instead of opening generic homepages',
